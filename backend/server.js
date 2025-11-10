@@ -814,4 +814,20 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
   }
 };
 
+app.get("/test-email", async (req, res) => {
+  try {
+    await transporter.sendMail({
+      from: `"Nandha Notes" <${process.env.GMAIL_USER}>`,
+      to: "23cs077@nandhaengg.org.com", // change this to your own test mail
+      subject: "✅ Test Email from Nandha Notes",
+      text: "If you see this, Gmail is configured correctly 🎉",
+    });
+    res.json({ success: true, message: "Email sent successfully ✅" });
+  } catch (error) {
+    console.error("❌ Email test failed:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
