@@ -5,13 +5,15 @@ import bodyParser from "body-parser";
 import nodemailer from "nodemailer";
 import multer from "multer";
 import { Octokit } from '@octokit/rest';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+// ✅ Environment Variables (included directly)
+const GITHUB_TOKEN = "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";
+const GITHUB_OWNER = "BALASANJEEV-NANDHA";
+const GITHUB_REPO = "nandha-notes-files";
 
 // ✅ Connect MongoDB Atlas
 mongoose
@@ -24,11 +26,8 @@ mongoose
 
 // ✅ GitHub Configuration
 const octokit = new Octokit({
-  auth: process.env.GITHUB_TOKEN
+  auth: GITHUB_TOKEN
 });
-
-const GITHUB_OWNER = process.env.GITHUB_OWNER;
-const GITHUB_REPO = process.env.GITHUB_REPO;
 
 // ✅ Multer for file handling - 10MB LIMIT
 const upload = multer({ 
@@ -57,7 +56,6 @@ const userSchema = new mongoose.Schema({
   // ✅ Add this field
   allowEmailNotifications: { type: Boolean, default: true }
 });
-
 
 const User = mongoose.model("User", userSchema);
 
@@ -550,7 +548,6 @@ const getFileTypeFromName = (fileName) => {
   return 'pdf'; // default
 };
 
-// ✅ UPDATED: Upload Note Route with 10MB limit and GitHub
 // ✅ UPDATED: Upload Note Route with GitHub + Email Notifications
 app.post("/upload-note", upload.single("file"), async (req, res) => {
   try {
@@ -651,7 +648,6 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
   }
 });
 
-
 // ✅ Route: Get All Notes
 app.get("/get-notes", async (req, res) => {
   try {
@@ -679,8 +675,6 @@ app.get("/get-notes", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch notes" });
   }
 });
-
-
 
 // ✅ Test GitHub Connection Route
 app.get("/test-github", async (req, res) => {
@@ -710,7 +704,6 @@ app.get("/test-github", async (req, res) => {
   }
 });
 
-
 // ✅ Function to check if user allows email notifications
 const checkEmailNotificationsAllowed = async (email) => {
   try {
@@ -722,8 +715,6 @@ const checkEmailNotificationsAllowed = async (email) => {
   }
 };
 
-
-// ✅ Updated function to send channel upload notifications with preference check
 // ✅ Channel Upload Notification Email — Styled like Password Reset (Teal Theme)
 const sendChannelUploadNotification = async (uploader, channel, note, channelMembers) => {
   try {
@@ -821,6 +812,5 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
     console.error("❌ Error in sendChannelUploadNotification:", err);
   }
 };
-
 
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
