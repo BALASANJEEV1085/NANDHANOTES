@@ -832,8 +832,8 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
 app.get("/test-email", async (req, res) => {
   try {
     const { data, error } = await resend.emails.send({
-      from: 'Nandha Notes <noreply@nandhanotes.com>', // Update with your verified domain
-      to: 'test@example.com', // Change to your test email
+      from: 'Nandha Notes <onboarding@resend.dev>',
+      to: 'balasnjeev1085@gmail.com', // Change to your test email
       subject: "✅ Test Email from Nandha Notes",
       html: "<p>If you see this, Resend is configured correctly 🎉</p>",
     });
