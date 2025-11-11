@@ -112,7 +112,6 @@ app.post("/signup", async (req, res) => {
     // ✅ Send verification email using Resend
     const { data, error } = await resend.emails.send({
       from: 'Nandha Notes <onboarding@resend.dev>',
- // Update with your verified domain
       to: email,
       subject: "📚 Verify your Nandha Notes Account",
       html: `
@@ -243,7 +242,6 @@ app.post("/request-reset", async (req, res) => {
     // ✅ Send reset email using Resend
     const { data, error } = await resend.emails.send({
       from: 'Nandha Notes <onboarding@resend.dev>',
-// Update with your verified domain
       to: email,
       subject: "🔐 Password Reset Code - Nandha Notes",
       html: `
@@ -754,7 +752,6 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
     for (const member of validRecipients) {
       const { data, error } = await resend.emails.send({
         from: 'Nandha Notes <onboarding@resend.dev>',
-
         to: member.email,
         subject: `📚 New Notes Uploaded in ${channel.name} - Nandha Notes`,
         html: `
@@ -828,5 +825,27 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
   }
 });
 
+// ✅ Test Resend Email Route
+app.get("/test-email", async (req, res) => {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'Nandha Notes <onboarding@resend.dev>',
+      to: 'balasnjeev1085@gmail.com.com', // Change to your test email
+      subject: "✅ Test Email from Nandha Notes",
+      html: "<p>If you see this, Resend is configured correctly 🎉</p>",
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, message: "Email sent successfully ✅", data });
+  } catch (error) {
+    console.error("❌ Email test failed:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 5000;          
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));  
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
