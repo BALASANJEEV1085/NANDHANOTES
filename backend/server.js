@@ -829,11 +829,11 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
 });
 
 // ✅ Test Resend Email Route
-app.get("/test-email", async (req, res) => {
-  try {
+app.get("/test-email", async (req, res) => {   // opens route
+  try {                                         // opens try
     const { data, error } = await resend.emails.send({
       from: 'Nandha Notes <onboarding@resend.dev>',
-      to: 'balasnjeev1085@gmail.com', // Change to your test email
+      to: 'balasnjeev1085@gmail.com',
       subject: "✅ Test Email from Nandha Notes",
       html: "<p>If you see this, Resend is configured correctly 🎉</p>",
     });
@@ -844,11 +844,11 @@ app.get("/test-email", async (req, res) => {
     }
 
     res.json({ success: true, message: "Email sent successfully ✅", data });
-  } catch (error) {
+  } catch (error) {                              // closes try
     console.error("❌ Email test failed:", error);
     res.status(500).json({ success: false, error: error.message });
   }
-});
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+});                                              // closes route ✅
 
+const PORT = process.env.PORT || 5000;          // correct Render-friendly port setup
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));  // starts server
