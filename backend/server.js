@@ -825,4 +825,20 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
   }
 };
 
+app.get("/test-email", async (req, res) => {
+  try {
+    await transporter.sendMail({
+      from: '"Nandha Notes" <noreply@nandhanotes.com>',
+      to: "balasnjeev1085@gmail.com",
+      subject: "✅ Test Email from Nandha Notes (Brevo SMTP)",
+      html: "<h2>🎉 Your Brevo SMTP configuration works perfectly!</h2>",
+    });
+    res.json({ success: true, message: "✅ Email sent successfully!" });
+  } catch (error) {
+    console.error("❌ Email test failed:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
