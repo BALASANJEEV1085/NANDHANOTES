@@ -1,7 +1,7 @@
 {
   "name": "nandha-notes-backend",
   "version": "1.0.0",
-  "description": "Backend server for Nandha Notes (Express + MongoDB + Cloudinary + Nodemailer)",
+  "description": "Backend server for Nandha Notes (Express + MongoDB + Cloudinary + Nodemailer + Resend)",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -15,6 +15,7 @@
     "cloudinary",
     "nodemailer",
     "multer",
+    "resend",
     "nandha-notes"
   ],
   "author": "Balaswathi",
@@ -29,7 +30,8 @@
     "mongoose": "^8.19.0",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
-    "nodemailer": "^7.0.7"
+    "nodemailer": "^7.0.7",
+    "resend": "^4.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
