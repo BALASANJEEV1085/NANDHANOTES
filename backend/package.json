@@ -29,9 +29,10 @@
     "mongoose": "^8.19.0",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
-    "nodemailer": "^7.0.7"
+    "nodemailer": "^7.0.7",
+    "resend": "^3.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
   }
-} 
+}
