@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import bodyParser from "body-parser";
-import nodemailer from "nodemailer";
+import { Resend } from 'resend';
 import multer from "multer";
 import { Octokit } from '@octokit/rest';
 import dotenv from 'dotenv';
@@ -29,6 +29,9 @@ const octokit = new Octokit({
 
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
+
+// ✅ Resend Configuration
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ✅ Multer for file handling - 10MB LIMIT
 const upload = multer({ 
@@ -94,15 +97,6 @@ const channelSchema = new mongoose.Schema({
 
 const Channel = mongoose.model("Channel", channelSchema);
 
-// ✅ Email Transporter - UPDATED with environment variables
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
-
 // ✅ Route: Signup
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
@@ -115,8 +109,10 @@ app.post("/signup", async (req, res) => {
     const newUser = new User({ username, email, password, verificationCode });
     await newUser.save();
 
-    await transporter.sendMail({
-      from: `"Nandha Notes" <${process.env.GMAIL_USER}>`,
+    // ✅ Send verification email using Resend
+    const { data, error } = await resend.emails.send({
+      from: 'Nandha Notes <onboarding@resend.dev>',
+ // Update with your verified domain
       to: email,
       subject: "📚 Verify your Nandha Notes Account",
       html: `
@@ -147,6 +143,11 @@ app.post("/signup", async (req, res) => {
         </div>
       `,
     });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ message: "Failed to send verification code" });
+    }
 
     res.json({ message: "Verification code sent successfully" });
   } catch (err) {
@@ -239,8 +240,10 @@ app.post("/request-reset", async (req, res) => {
     user.resetCode = resetCode;
     await user.save();
 
-    await transporter.sendMail({
-      from: `"Nandha Notes" <${process.env.GMAIL_USER}>`,
+    // ✅ Send reset email using Resend
+    const { data, error } = await resend.emails.send({
+      from: 'Nandha Notes <onboarding@resend.dev>',
+// Update with your verified domain
       to: email,
       subject: "🔐 Password Reset Code - Nandha Notes",
       html: `
@@ -272,6 +275,11 @@ app.post("/request-reset", async (req, res) => {
         </div>
       `,
     });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ message: "Failed to send reset code." });
+    }
 
     res.json({ message: "Reset code sent to your email." });
   } catch (err) {
@@ -744,8 +752,9 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
     const appBaseUrl = "http://localhost:3000"; // ⚙️ Update this when deployed
 
     for (const member of validRecipients) {
-      await transporter.sendMail({
-        from: `"Nandha Notes" <${process.env.GMAIL_USER}>`,
+      const { data, error } = await resend.emails.send({
+        from: 'Nandha Notes <onboarding@resend.dev>',
+
         to: member.email,
         subject: `📚 New Notes Uploaded in ${channel.name} - Nandha Notes`,
         html: `
@@ -805,29 +814,40 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
           </div>
         `,
       });
-      console.log(`✅ Channel upload notification sent to ${member.email}`);
+
+      if (error) {
+        console.error(`❌ Failed to send email to ${member.email}:`, error);
+      } else {
+        console.log(`✅ Channel upload notification sent to ${member.email}`);
+      }
     }
 
     console.log(`✅ All upload notifications sent for channel "${channel.name}"`);
   } catch (err) {
     console.error("❌ Error in sendChannelUploadNotification:", err);
   }
-};
+});
 
+// ✅ Test Resend Email Route
 app.get("/test-email", async (req, res) => {
   try {
-    await transporter.sendMail({
-      from: `"Nandha Notes" <${process.env.GMAIL_USER}>`,
-      to: "23cs077@nandhaengg.org.com", // change this to your own test mail
+    const { data, error } = await resend.emails.send({
+      from: 'Nandha Notes <noreply@nandhanotes.com>', // Update with your verified domain
+      to: 'test@example.com', // Change to your test email
       subject: "✅ Test Email from Nandha Notes",
-      text: "If you see this, Gmail is configured correctly 🎉",
+      html: "<p>If you see this, Resend is configured correctly 🎉</p>",
     });
-    res.json({ success: true, message: "Email sent successfully ✅" });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, message: "Email sent successfully ✅", data });
   } catch (error) {
     console.error("❌ Email test failed:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
 
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
