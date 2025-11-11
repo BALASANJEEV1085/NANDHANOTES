@@ -58,7 +58,6 @@ const userSchema = new mongoose.Schema({
   allowEmailNotifications: { type: Boolean, default: true }
 });
 
-
 const User = mongoose.model("User", userSchema);
 
 const noteSchema = new mongoose.Schema({
@@ -95,13 +94,24 @@ const channelSchema = new mongoose.Schema({
 
 const Channel = mongoose.model("Channel", channelSchema);
 
-// ✅ Email Transporter
+// ✅ Brevo SMTP Transporter Configuration
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
+  port: process.env.SMTP_PORT || 587,
+  secure: false,
   auth: {
-    user: "balasanjeevswathi1001@gmail.com",
-    pass: "swgu sgcb trta wxqo",
+    user: process.env.SMTP_USER || "9b582b001@smtp-brevo.com",
+    pass: process.env.SMTP_PASS,
   },
+});
+
+// Verify Brevo SMTP connection
+transporter.verify(function (error, success) {
+  if (error) {
+    console.error("❌ Brevo SMTP connection error:", error);
+  } else {
+    console.log("✅ Brevo SMTP server is ready to take our messages");
+  }
 });
 
 // ✅ Route: Signup
@@ -117,7 +127,7 @@ app.post("/signup", async (req, res) => {
     await newUser.save();
 
     await transporter.sendMail({
-      from: '"Nandha Notes" <your_email@gmail.com>',
+      from: '"Nandha Notes" <9b582b001@smtp-brevo.com>',
       to: email,
       subject: "📚 Verify your Nandha Notes Account",
       html: `
@@ -241,7 +251,7 @@ app.post("/request-reset", async (req, res) => {
     await user.save();
 
     await transporter.sendMail({
-      from: '"Nandha Notes" <your_email@gmail.com>',
+      from: '"Nandha Notes" <9b582b001@smtp-brevo.com>',
       to: email,
       subject: "🔐 Password Reset Code - Nandha Notes",
       html: `
@@ -550,7 +560,6 @@ const getFileTypeFromName = (fileName) => {
   return 'pdf'; // default
 };
 
-// ✅ UPDATED: Upload Note Route with 10MB limit and GitHub
 // ✅ UPDATED: Upload Note Route with GitHub + Email Notifications
 app.post("/upload-note", upload.single("file"), async (req, res) => {
   try {
@@ -651,7 +660,6 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
   }
 });
 
-
 // ✅ Route: Get All Notes
 app.get("/get-notes", async (req, res) => {
   try {
@@ -679,8 +687,6 @@ app.get("/get-notes", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch notes" });
   }
 });
-
-
 
 // ✅ Test GitHub Connection Route
 app.get("/test-github", async (req, res) => {
@@ -710,7 +716,6 @@ app.get("/test-github", async (req, res) => {
   }
 });
 
-
 // ✅ Function to check if user allows email notifications
 const checkEmailNotificationsAllowed = async (email) => {
   try {
@@ -722,8 +727,6 @@ const checkEmailNotificationsAllowed = async (email) => {
   }
 };
 
-
-// ✅ Updated function to send channel upload notifications with preference check
 // ✅ Channel Upload Notification Email — Styled like Password Reset (Teal Theme)
 const sendChannelUploadNotification = async (uploader, channel, note, channelMembers) => {
   try {
@@ -753,7 +756,7 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
 
     for (const member of validRecipients) {
       await transporter.sendMail({
-        from: '"Nandha Notes" <balasanjeevswathi1001@gmail.com>',
+        from: '"Nandha Notes" <9b582b001@smtp-brevo.com>',
         to: member.email,
         subject: `📚 New Notes Uploaded in ${channel.name} - Nandha Notes`,
         html: `
@@ -821,6 +824,5 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
     console.error("❌ Error in sendChannelUploadNotification:", err);
   }
 };
-
 
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
