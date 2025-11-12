@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import bodyParser from "body-parser";
-import nodemailer from "nodemailer";
+import sgMail from '@sendgrid/mail';
 import multer from "multer";
 import { Octokit } from '@octokit/rest';
 import dotenv from 'dotenv';
@@ -12,6 +12,9 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+// ✅ Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // ✅ Connect MongoDB Atlas
 mongoose.connect(
@@ -28,25 +31,6 @@ const octokit = new Octokit({
 
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
-
-// ✅ Brevo Email Transporter
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com",
-  port: 587,
-  auth: {
-    user: process.env.BREVO_SMTP_USER,
-    pass: process.env.BREVO_SMTP_KEY
-  }
-});
-
-// Test email connection
-transporter.verify((error, success) => {
-  if (error) {
-    console.log("❌ Brevo connection failed:", error);
-  } else {
-    console.log("✅ Brevo email server is ready");
-  }
-});
 
 // ✅ Multer for file handling - 10MB LIMIT
 const upload = multer({ 
@@ -109,6 +93,25 @@ const channelSchema = new mongoose.Schema({
 
 const Channel = mongoose.model("Channel", channelSchema);
 
+// ✅ Email sending function
+const sendEmail = async (to, subject, html) => {
+  try {
+    const msg = {
+      to,
+      from: 'noreply@nandhanotes.onrender.com', // This can be any email
+      subject,
+      html,
+    };
+
+    await sgMail.send(msg);
+    console.log(`✅ Email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ SendGrid error:', error.response?.body || error.message);
+    return false;
+  }
+};
+
 // ✅ Route: Signup
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
@@ -121,45 +124,46 @@ app.post("/signup", async (req, res) => {
     const newUser = new User({ username, email, password, verificationCode });
     await newUser.save();
 
-    // Send verification email with Brevo
-    await transporter.sendMail({
-      from: '"Nandha Notes" <noreply@nandha-notes.netlify.app>',
-      to: email,
-      subject: "📚 Verify your Nandha Notes Account",
-      html: `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
-          <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            <div style="background-color: #16a34a; padding: 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 24px;">📚 Nandha Notes</h1>
+    const emailSent = await sendEmail(
+      email,
+      "📚 Verify your Nandha Notes Account",
+      `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
+        <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+          <div style="background-color: #16a34a; padding: 20px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">📚 Nandha Notes</h1>
+          </div>
+          <div style="padding: 30px; text-align: center;">
+            <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Verify Your Email Address</h2>
+            <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+              Hello ${username} 👋, thank you for signing up for <strong>Nandha Notes</strong>.<br>
+              To complete your registration, please use the verification code below:
+            </p>
+            <div style="display: inline-block; padding: 15px 30px; background-color: #16a34a; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
+              ${verificationCode}
             </div>
-            <div style="padding: 30px; text-align: center;">
-              <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Verify Your Email Address</h2>
-              <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-                Hello ${username} 👋, thank you for signing up for <strong>Nandha Notes</strong>.<br>
-                To complete your registration, please use the verification code below:
-              </p>
-              <div style="display: inline-block; padding: 15px 30px; background-color: #16a34a; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
-                ${verificationCode}
-              </div>
-              <p style="color: #777777; font-size: 14px; margin-top: 20px;">
-                This code will expire in 10 minutes. Please do not share it with anyone.
-              </p>
-            </div>
-            <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
-              <p style="margin: 0;">
-                © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
-              </p>
-            </div>
+            <p style="color: #777777; font-size: 14px; margin-top: 20px;">
+              This code will expire in 10 minutes. Please do not share it with anyone.
+            </p>
+          </div>
+          <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
+            <p style="margin: 0;">
+              © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
+            </p>
           </div>
         </div>
-      `,
-    });
+      </div>
+      `
+    );
 
-    console.log(`✅ Verification email sent to ${email}`);
+    if (!emailSent) {
+      return res.status(500).json({ message: "Failed to send verification email" });
+    }
+
     res.json({ message: "Verification code sent successfully" });
   } catch (err) {
     console.error("❌ Signup error:", err);
-    res.status(500).json({ message: "Failed to send verification code" });
+    res.status(500).json({ message: "Failed to create account" });
   }
 });
 
@@ -254,46 +258,47 @@ app.post("/request-reset", async (req, res) => {
     user.resetCode = resetCode;
     await user.save();
 
-    // Send reset email with Brevo
-    await transporter.sendMail({
-      from: '"Nandha Notes" <noreply@nandha-notes.netlify.app>',
-      to: email,
-      subject: "🔐 Password Reset Code - Nandha Notes",
-      html: `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
-          <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            <div style="background-color: #dc2626; padding: 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 24px;">🔐 Nandha Notes</h1>
+    const emailSent = await sendEmail(
+      email,
+      "🔐 Password Reset Code - Nandha Notes",
+      `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
+        <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+          <div style="background-color: #dc2626; padding: 20px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">🔐 Nandha Notes</h1>
+          </div>
+          <div style="padding: 30px; text-align: center;">
+            <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Password Reset Request</h2>
+            <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+              We received a request to reset your password for your <strong>Nandha Notes</strong> account.
+              Use the code below to reset your password:
+            </p>
+            <div style="display: inline-block; padding: 15px 30px; background-color: #dc2626; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
+              ${resetCode}
             </div>
-            <div style="padding: 30px; text-align: center;">
-              <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Password Reset Request</h2>
-              <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-                We received a request to reset your password for your <strong>Nandha Notes</strong> account.
-                Use the code below to reset your password:
-              </p>
-              <div style="display: inline-block; padding: 15px 30px; background-color: #dc2626; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
-                ${resetCode}
-              </div>
-              <p style="color: #777777; font-size: 14px; margin-top: 20px;">
-                This code will expire in 10 minutes.<br>
-                If you didn't request this, you can safely ignore this email.
-              </p>
-            </div>
-            <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
-              <p style="margin: 0;">
-                © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
-              </p>
-            </div>
+            <p style="color: #777777; font-size: 14px; margin-top: 20px;">
+              This code will expire in 10 minutes.<br>
+              If you didn't request this, you can safely ignore this email.
+            </p>
+          </div>
+          <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
+            <p style="margin: 0;">
+              © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
+            </p>
           </div>
         </div>
-      `,
-    });
+      </div>
+      `
+    );
 
-    console.log(`✅ Reset code sent to ${email}`);
+    if (!emailSent) {
+      return res.status(500).json({ message: "Failed to send reset code" });
+    }
+
     res.json({ message: "Reset code sent to your email." });
   } catch (err) {
     console.error("❌ Reset request error:", err);
-    res.status(500).json({ message: "Failed to send reset code." });
+    res.status(500).json({ message: "Failed to process reset request" });
   }
 });
 
@@ -717,20 +722,24 @@ app.get("/test-github", async (req, res) => {
 // ✅ Test Email Route
 app.get("/test-email", async (req, res) => {
   try {
-    await transporter.sendMail({
-      from: '"Nandha Notes" <noreply@nandha-notes.netlify.app>',
-      to: "balasnjeev1085@gmail.com",
-      subject: "✅ Brevo Email Test - Nandha Notes",
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h2 style="color: #16a34a;">✅ Brevo Email Test Successful!</h2>
-          <p>Your Nandha Notes email system is working perfectly with Brevo.</p>
-          <p>Time: ${new Date().toString()}</p>
-        </div>
-      `,
-    });
+    const emailSent = await sendEmail(
+      "balasnjeev1085@gmail.com",
+      "✅ SendGrid Test - Nandha Notes",
+      `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #16a34a;">✅ SendGrid Email Test Successful!</h2>
+        <p>Your Nandha Notes email system is working perfectly with SendGrid.</p>
+        <p>Time: ${new Date().toString()}</p>
+        <p>You can now send verification and reset emails to your users!</p>
+      </div>
+      `
+    );
 
-    res.json({ message: "Test email sent successfully!" });
+    if (emailSent) {
+      res.json({ message: "Test email sent successfully!" });
+    } else {
+      res.status(500).json({ message: "Failed to send test email" });
+    }
   } catch (error) {
     console.error("❌ Test email failed:", error);
     res.status(500).json({ message: "Test email failed", error: error.message });
