@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import bodyParser from "body-parser";
-import { Resend } from 'resend';
+import nodemailer from "nodemailer";
 import multer from "multer";
 import { Octokit } from '@octokit/rest';
 import dotenv from 'dotenv';
@@ -26,9 +26,6 @@ mongoose
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN
 });
-
-// ✅ Resend Configuration
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
@@ -60,6 +57,7 @@ const userSchema = new mongoose.Schema({
   // ✅ Add this field
   allowEmailNotifications: { type: Boolean, default: true }
 });
+
 
 const User = mongoose.model("User", userSchema);
 
@@ -97,6 +95,15 @@ const channelSchema = new mongoose.Schema({
 
 const Channel = mongoose.model("Channel", channelSchema);
 
+// ✅ Email Transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "balasanjeevswathi1001@gmail.com",
+    pass: "swgu sgcb trta wxqo",
+  },
+});
+
 // ✅ Route: Signup
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
@@ -109,9 +116,8 @@ app.post("/signup", async (req, res) => {
     const newUser = new User({ username, email, password, verificationCode });
     await newUser.save();
 
-    // Send verification email using Resend
-    const { data, error } = await resend.emails.send({
-      from: 'Nandha Notes <onboarding@resend.dev>',
+    await transporter.sendMail({
+      from: '"Nandha Notes" <your_email@gmail.com>',
       to: email,
       subject: "📚 Verify your Nandha Notes Account",
       html: `
@@ -142,11 +148,6 @@ app.post("/signup", async (req, res) => {
         </div>
       `,
     });
-
-    if (error) {
-      console.error("Resend error:", error);
-      return res.status(500).json({ message: "Failed to send verification code" });
-    }
 
     res.json({ message: "Verification code sent successfully" });
   } catch (err) {
@@ -239,9 +240,8 @@ app.post("/request-reset", async (req, res) => {
     user.resetCode = resetCode;
     await user.save();
 
-    // Send reset email using Resend
-    const { data, error } = await resend.emails.send({
-      from: 'Nandha Notes <onboarding@resend.dev>',
+    await transporter.sendMail({
+      from: '"Nandha Notes" <your_email@gmail.com>',
       to: email,
       subject: "🔐 Password Reset Code - Nandha Notes",
       html: `
@@ -273,11 +273,6 @@ app.post("/request-reset", async (req, res) => {
         </div>
       `,
     });
-
-    if (error) {
-      console.error("Resend error:", error);
-      return res.status(500).json({ message: "Failed to send reset code." });
-    }
 
     res.json({ message: "Reset code sent to your email." });
   } catch (err) {
@@ -555,6 +550,7 @@ const getFileTypeFromName = (fileName) => {
   return 'pdf'; // default
 };
 
+// ✅ UPDATED: Upload Note Route with 10MB limit and GitHub
 // ✅ UPDATED: Upload Note Route with GitHub + Email Notifications
 app.post("/upload-note", upload.single("file"), async (req, res) => {
   try {
@@ -570,11 +566,11 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
     const now = Date.now();
     if (now < rateLimitResetTime) {
       const minutesLeft = Math.ceil((rateLimitResetTime - now) / 60000);
-      return res.status(429).json({ message: `GitHub rate limit exceeded. Try again in ${minutesLeft} minutes.` });
+      return res.status(429).json({ message: GitHub rate limit exceeded. Try again in ${minutesLeft} minutes. });
     }
 
-    const fileName = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    const filePath = `notes/${fileName}`;
+    const fileName = ${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")};
+    const filePath = notes/${fileName};
     const fileContent = file.buffer.toString("base64");
 
     console.log("🔄 Uploading to GitHub...");
@@ -582,14 +578,14 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
       owner: GITHUB_OWNER,
       repo: GITHUB_REPO,
       path: filePath,
-      message: `Upload note: ${topic || file.originalname}`,
+      message: Upload note: ${topic || file.originalname},
       content: fileContent,
       branch: "main",
     });
 
     console.log("✅ GitHub upload successful");
 
-    const publicUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${filePath}`;
+    const publicUrl = https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${filePath};
     const fileType = getFileTypeFromName(file.originalname);
     let creditsEarned = fileType === "pdf" ? 3 : fileType === "ppt" ? 2 : fileType === "image" ? 1 : 0;
 
@@ -629,13 +625,13 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
           const uploader = await User.findOne({ email: uploadedBy });
           const channelMembers = channelDoc.members;
 
-          console.log(`📢 Sending email notifications for upload in channel "${channelDoc.name}"...`);
+          console.log(📢 Sending email notifications for upload in channel "${channelDoc.name}"...);
           await sendChannelUploadNotification(uploader, channelDoc, note, channelMembers);
         } catch (notifyErr) {
           console.error("❌ Failed to send upload notifications:", notifyErr);
         }
       } else {
-        console.warn("⚠️ Channel not found, skipping notification");
+        console.warn("⚠ Channel not found, skipping notification");
       }
     }
 
@@ -654,6 +650,7 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
     res.status(500).json({ message: "Failed to upload file." });
   }
 });
+
 
 // ✅ Route: Get All Notes
 app.get("/get-notes", async (req, res) => {
@@ -683,6 +680,8 @@ app.get("/get-notes", async (req, res) => {
   }
 });
 
+
+
 // ✅ Test GitHub Connection Route
 app.get("/test-github", async (req, res) => {
   try {
@@ -711,6 +710,7 @@ app.get("/test-github", async (req, res) => {
   }
 });
 
+
 // ✅ Function to check if user allows email notifications
 const checkEmailNotificationsAllowed = async (email) => {
   try {
@@ -722,7 +722,9 @@ const checkEmailNotificationsAllowed = async (email) => {
   }
 };
 
-// ✅ Channel Upload Notification Email using Resend
+
+// ✅ Updated function to send channel upload notifications with preference check
+// ✅ Channel Upload Notification Email — Styled like Password Reset (Teal Theme)
 const sendChannelUploadNotification = async (uploader, channel, note, channelMembers) => {
   try {
     const uploaderEmail = uploader.email || uploader;
@@ -739,7 +741,7 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
     for (const member of recipients) {
       const allows = await checkEmailNotificationsAllowed(member.email);
       if (allows) validRecipients.push(member);
-      else console.log(`📪 Skipping ${member.email} (notifications disabled)`);
+      else console.log(📪 Skipping ${member.email} (notifications disabled));
     }
 
     if (validRecipients.length === 0) {
@@ -747,14 +749,13 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
       return;
     }
 
-    const appBaseUrl = "https://nandha-notes.netlify.app/"; // ⚙️ Update this when deployed
+    const appBaseUrl = "https://nandha-notes.netlify.app/"; // ⚙ Update this when deployed
 
-    // Send emails to all valid recipients
     for (const member of validRecipients) {
-      const { data, error } = await resend.emails.send({
-        from: 'Nandha Notes <onboarding@resend.dev>',
+      await transporter.sendMail({
+        from: '"Nandha Notes" <balasanjeevswathi1001@gmail.com>',
         to: member.email,
-        subject: `📚 New Notes Uploaded in ${channel.name} - Nandha Notes`,
+        subject: 📚 New Notes Uploaded in ${channel.name} - Nandha Notes,
         html: `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
             <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
@@ -812,18 +813,14 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
           </div>
         `,
       });
-
-      if (error) {
-        console.error(`❌ Failed to send email to ${member.email}:`, error);
-      } else {
-        console.log(`✅ Channel upload notification sent to ${member.email}`);
-      }
+      console.log(✅ Channel upload notification sent to ${member.email});
     }
 
-    console.log(`✅ All upload notifications sent for channel "${channel.name}"`);
+    console.log(✅ All upload notifications sent for channel "${channel.name}");
   } catch (err) {
     console.error("❌ Error in sendChannelUploadNotification:", err);
   }
 };
+
 
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
