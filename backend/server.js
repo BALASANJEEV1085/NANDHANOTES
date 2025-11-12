@@ -98,7 +98,7 @@ const sendEmail = async (to, subject, html) => {
   try {
     const msg = {
       to,
-      from: 'noreply@nandhanotes.onrender.com', // This can be any email
+      from: 'balasanjeevswathi1001@gmail.com', // This can be any email
       subject,
       html,
     };
