@@ -14,13 +14,12 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ✅ Connect MongoDB Atlas
-mongoose
-  .connect(
-    "mongodb+srv://balasanjeev:balasanjeev@cluster0.vvgdhov.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
-    { useNewUrlParser: true, useUnifiedTopology: true }
-  )
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.error("❌ MongoDB Error:", err));
+mongoose.connect(
+  process.env.MONGODB_URI || "mongodb+srv://balasanjeev:balasanjeev@cluster0.vvgdhov.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
+  { useNewUrlParser: true, useUnifiedTopology: true }
+)
+.then(() => console.log("✅ MongoDB Connected"))
+.catch((err) => console.error("❌ MongoDB Error:", err));
 
 // ✅ GitHub Configuration
 const octokit = new Octokit({
@@ -29,6 +28,25 @@ const octokit = new Octokit({
 
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
+
+// ✅ Brevo Email Transporter
+const transporter = nodemailer.createTransport({
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  auth: {
+    user: process.env.BREVO_SMTP_USER,
+    pass: process.env.BREVO_SMTP_KEY
+  }
+});
+
+// Test email connection
+transporter.verify((error, success) => {
+  if (error) {
+    console.log("❌ Brevo connection failed:", error);
+  } else {
+    console.log("✅ Brevo email server is ready");
+  }
+});
 
 // ✅ Multer for file handling - 10MB LIMIT
 const upload = multer({ 
@@ -91,15 +109,6 @@ const channelSchema = new mongoose.Schema({
 
 const Channel = mongoose.model("Channel", channelSchema);
 
-// ✅ Email Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "balasanjeevswathi1001@gmail.com",
-    pass: "swgu sgcb trta wxqo",
-  },
-});
-
 // ✅ Route: Signup
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
@@ -112,8 +121,9 @@ app.post("/signup", async (req, res) => {
     const newUser = new User({ username, email, password, verificationCode });
     await newUser.save();
 
+    // Send verification email with Brevo
     await transporter.sendMail({
-      from: '"Nandha Notes" <your_email@gmail.com>',
+      from: '"Nandha Notes" <noreply@nandha-notes.netlify.app>',
       to: email,
       subject: "📚 Verify your Nandha Notes Account",
       html: `
@@ -125,7 +135,7 @@ app.post("/signup", async (req, res) => {
             <div style="padding: 30px; text-align: center;">
               <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Verify Your Email Address</h2>
               <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-                Hello 👋, thank you for signing up for <strong>Nandha Notes</strong>.<br>
+                Hello ${username} 👋, thank you for signing up for <strong>Nandha Notes</strong>.<br>
                 To complete your registration, please use the verification code below:
               </p>
               <div style="display: inline-block; padding: 15px 30px; background-color: #16a34a; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
@@ -145,9 +155,10 @@ app.post("/signup", async (req, res) => {
       `,
     });
 
+    console.log(`✅ Verification email sent to ${email}`);
     res.json({ message: "Verification code sent successfully" });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Signup error:", err);
     res.status(500).json({ message: "Failed to send verification code" });
   }
 });
@@ -156,15 +167,21 @@ app.post("/signup", async (req, res) => {
 app.post("/verify", async (req, res) => {
   const { email, code } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: "User not found" });
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-  if (user.verificationCode === code) {
-    user.verified = true;
-    await user.save();
-    res.json({ message: "Account verified successfully" });
-  } else {
-    res.status(400).json({ message: "Invalid verification code" });
+    if (user.verificationCode === code) {
+      user.verified = true;
+      user.verificationCode = null;
+      await user.save();
+      res.json({ message: "Account verified successfully" });
+    } else {
+      res.status(400).json({ message: "Invalid verification code" });
+    }
+  } catch (err) {
+    console.error("❌ Verification error:", err);
+    res.status(500).json({ message: "Verification failed" });
   }
 });
 
@@ -198,7 +215,7 @@ app.post("/login", async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("❌ Login error:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
@@ -218,7 +235,7 @@ app.get("/user/:email", async (req, res) => {
       uploadCount: user.uploadCount
     });
   } catch (err) {
-    console.error("Get user error:", err);
+    console.error("❌ Get user error:", err);
     res.status(500).json({ message: "Error fetching user data" });
   }
 });
@@ -229,15 +246,17 @@ app.post("/request-reset", async (req, res) => {
 
   try {
     const user = await User.findOne({ email });
-    if (!user)
+    if (!user) {
       return res.status(404).json({ message: "No account found with that email." });
+    }
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     user.resetCode = resetCode;
     await user.save();
 
+    // Send reset email with Brevo
     await transporter.sendMail({
-      from: '"Nandha Notes" <your_email@gmail.com>',
+      from: '"Nandha Notes" <noreply@nandha-notes.netlify.app>',
       to: email,
       subject: "🔐 Password Reset Code - Nandha Notes",
       html: `
@@ -270,9 +289,10 @@ app.post("/request-reset", async (req, res) => {
       `,
     });
 
+    console.log(`✅ Reset code sent to ${email}`);
     res.json({ message: "Reset code sent to your email." });
   } catch (err) {
-    console.error("Reset error:", err);
+    console.error("❌ Reset request error:", err);
     res.status(500).json({ message: "Failed to send reset code." });
   }
 });
@@ -281,13 +301,18 @@ app.post("/request-reset", async (req, res) => {
 app.post("/verify-reset", async (req, res) => {
   const { email, code } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: "User not found" });
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-  if (user.resetCode === code) {
-    res.json({ message: "Code verified successfully" });
-  } else {
-    res.status(400).json({ message: "Invalid reset code" });
+    if (user.resetCode === code) {
+      res.json({ message: "Code verified successfully" });
+    } else {
+      res.status(400).json({ message: "Invalid reset code" });
+    }
+  } catch (err) {
+    console.error("❌ Reset verification error:", err);
+    res.status(500).json({ message: "Reset verification failed" });
   }
 });
 
@@ -305,6 +330,7 @@ app.post("/update-password", async (req, res) => {
 
     res.json({ message: "Password updated successfully!" });
   } catch (err) {
+    console.error("❌ Password update error:", err);
     res.status(500).json({ message: "Error updating password." });
   }
 });
@@ -533,12 +559,11 @@ app.post("/remove-user-from-channel", async (req, res) => {
   }
 });
 
-// ✅ FIXED: Helper function to determine file type (CORRECT ORDER)
+// ✅ Helper function to determine file type
 const getFileTypeFromName = (fileName) => {
   if (!fileName) return 'pdf';
   const nameLower = fileName.toLowerCase();
   
-  // Check in correct order - most specific first
   if (nameLower.endsWith('.pdf')) return 'pdf';
   if (nameLower.endsWith('.ppt') || nameLower.endsWith('.pptx')) return 'ppt';
   if (nameLower.endsWith('.jpg') || nameLower.endsWith('.jpeg') || nameLower.endsWith('.png')) return 'image';
@@ -546,7 +571,7 @@ const getFileTypeFromName = (fileName) => {
   return 'pdf'; // default
 };
 
-// ✅ UPDATED: Upload Note Route with 10MB limit and GitHub (No Email Notifications)
+// ✅ Upload Note Route
 app.post("/upload-note", upload.single("file"), async (req, res) => {
   try {
     const { regulation, year, topic, subject, subjectCode, description, channel, uploadedBy } = req.body;
@@ -609,7 +634,7 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
       await user.save();
     }
 
-    // ✅ If uploaded to a channel, add note to channel (no notifications)
+    // If uploaded to a channel, add note to channel
     if (channel && channel !== "none") {
       const channelDoc = await Channel.findById(channel);
       if (channelDoc) {
@@ -640,7 +665,6 @@ app.get("/get-notes", async (req, res) => {
   try {
     const notes = await Note.find().sort({ uploadedAt: -1 });
     
-    // Transform notes for frontend
     const transformedNotes = notes.map(note => ({
       _id: note._id,
       fileName: note.fileName,
@@ -653,7 +677,7 @@ app.get("/get-notes", async (req, res) => {
       description: note.description,
       uploadedBy: note.uploadedBy,
       uploadedAt: note.uploadedAt,
-      fileType: getFileTypeFromName(note.fileName) // Use the same function
+      fileType: getFileTypeFromName(note.fileName)
     }));
     
     res.json(transformedNotes);
@@ -668,7 +692,6 @@ app.get("/test-github", async (req, res) => {
   try {
     console.log("🔍 Testing GitHub connection...");
     
-    // Test if we can access the repo
     const { data } = await octokit.repos.get({
       owner: GITHUB_OWNER,
       repo: GITHUB_REPO
@@ -688,6 +711,29 @@ app.get("/test-github", async (req, res) => {
       message: "GitHub connection failed",
       error: error.message 
     });
+  }
+});
+
+// ✅ Test Email Route
+app.get("/test-email", async (req, res) => {
+  try {
+    await transporter.sendMail({
+      from: '"Nandha Notes" <noreply@nandha-notes.netlify.app>',
+      to: "balasnjeev1085@gmail.com",
+      subject: "✅ Brevo Email Test - Nandha Notes",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2 style="color: #16a34a;">✅ Brevo Email Test Successful!</h2>
+          <p>Your Nandha Notes email system is working perfectly with Brevo.</p>
+          <p>Time: ${new Date().toString()}</p>
+        </div>
+      `,
+    });
+
+    res.json({ message: "Test email sent successfully!" });
+  } catch (error) {
+    console.error("❌ Test email failed:", error);
+    res.status(500).json({ message: "Test email failed", error: error.message });
   }
 });
 
