@@ -551,7 +551,6 @@ const getFileTypeFromName = (fileName) => {
 };
 
 // ✅ UPDATED: Upload Note Route with 10MB limit and GitHub
-// ✅ UPDATED: Upload Note Route with GitHub + Email Notifications
 app.post("/upload-note", upload.single("file"), async (req, res) => {
   try {
     const { regulation, year, topic, subject, subjectCode, description, channel, uploadedBy } = req.body;
@@ -562,15 +561,17 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
     if (!file) return res.status(400).json({ message: "No file uploaded" });
     if (file.size > 10 * 1024 * 1024) return res.status(400).json({ message: "File too large. Maximum 10MB." });
 
-    // Check GitHub rate limit
+    // ✅ Check GitHub rate limit
     const now = Date.now();
     if (now < rateLimitResetTime) {
       const minutesLeft = Math.ceil((rateLimitResetTime - now) / 60000);
-      return res.status(429).json({ message: GitHub rate limit exceeded. Try again in ${minutesLeft} minutes. });
+      // ✅ FIXED: wrapped with backticks
+      return res.status(429).json({ message: `GitHub rate limit exceeded. Try again in ${minutesLeft} minutes.` });
     }
 
-    const fileName = ${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")};
-    const filePath = notes/${fileName};
+    // ✅ FIXED: use backticks for template literal
+    const fileName = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+    const filePath = `notes/${fileName}`;
     const fileContent = file.buffer.toString("base64");
 
     console.log("🔄 Uploading to GitHub...");
@@ -578,14 +579,16 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
       owner: GITHUB_OWNER,
       repo: GITHUB_REPO,
       path: filePath,
-      message: Upload note: ${topic || file.originalname},
+      // ✅ FIXED: wrapped message in backticks
+      message: `Upload note: ${topic || file.originalname}`,
       content: fileContent,
       branch: "main",
     });
 
     console.log("✅ GitHub upload successful");
 
-    const publicUrl = https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${filePath};
+    // ✅ FIXED: wrap URL with backticks
+    const publicUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${filePath}`;
     const fileType = getFileTypeFromName(file.originalname);
     let creditsEarned = fileType === "pdf" ? 3 : fileType === "ppt" ? 2 : fileType === "image" ? 1 : 0;
 
@@ -614,7 +617,7 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
       await user.save();
     }
 
-    // ✅ If uploaded to a channel, notify all members
+    // ✅ Notify channel members if applicable
     if (channel && channel !== "none") {
       const channelDoc = await Channel.findById(channel);
       if (channelDoc) {
@@ -625,13 +628,13 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
           const uploader = await User.findOne({ email: uploadedBy });
           const channelMembers = channelDoc.members;
 
-          console.log(📢 Sending email notifications for upload in channel "${channelDoc.name}"...);
+          console.log(`📢 Sending email notifications for upload in channel "${channelDoc.name}"...`);
           await sendChannelUploadNotification(uploader, channelDoc, note, channelMembers);
         } catch (notifyErr) {
           console.error("❌ Failed to send upload notifications:", notifyErr);
         }
       } else {
-        console.warn("⚠ Channel not found, skipping notification");
+        console.warn("⚠️ Channel not found, skipping notification");
       }
     }
 
@@ -650,6 +653,7 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
     res.status(500).json({ message: "Failed to upload file." });
   }
 });
+
 
 
 // ✅ Route: Get All Notes
