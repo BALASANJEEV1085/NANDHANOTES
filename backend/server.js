@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import bodyParser from "body-parser";
-import nodemailer from "nodemailer";
+import { Resend } from 'resend';
 import multer from "multer";
 import { Octokit } from '@octokit/rest';
 import dotenv from 'dotenv';
@@ -26,6 +26,9 @@ mongoose
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN
 });
+
+// ✅ Resend Configuration
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const GITHUB_OWNER = process.env.GITHUB_OWNER;
 const GITHUB_REPO = process.env.GITHUB_REPO;
@@ -57,7 +60,6 @@ const userSchema = new mongoose.Schema({
   // ✅ Add this field
   allowEmailNotifications: { type: Boolean, default: true }
 });
-
 
 const User = mongoose.model("User", userSchema);
 
@@ -95,15 +97,6 @@ const channelSchema = new mongoose.Schema({
 
 const Channel = mongoose.model("Channel", channelSchema);
 
-// ✅ Email Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "balasanjeevswathi1001@gmail.com",
-    pass: "swgu sgcb trta wxqo",
-  },
-});
-
 // ✅ Route: Signup
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
@@ -116,8 +109,9 @@ app.post("/signup", async (req, res) => {
     const newUser = new User({ username, email, password, verificationCode });
     await newUser.save();
 
-    await transporter.sendMail({
-      from: '"Nandha Notes" <your_email@gmail.com>',
+    // Send verification email using Resend
+    const { data, error } = await resend.emails.send({
+      from: 'Nandha Notes <onboarding@resend.dev>',
       to: email,
       subject: "📚 Verify your Nandha Notes Account",
       html: `
@@ -148,6 +142,11 @@ app.post("/signup", async (req, res) => {
         </div>
       `,
     });
+
+    if (error) {
+      console.error("Resend error:", error);
+      return res.status(500).json({ message: "Failed to send verification code" });
+    }
 
     res.json({ message: "Verification code sent successfully" });
   } catch (err) {
@@ -240,8 +239,9 @@ app.post("/request-reset", async (req, res) => {
     user.resetCode = resetCode;
     await user.save();
 
-    await transporter.sendMail({
-      from: '"Nandha Notes" <your_email@gmail.com>',
+    // Send reset email using Resend
+    const { data, error } = await resend.emails.send({
+      from: 'Nandha Notes <onboarding@resend.dev>',
       to: email,
       subject: "🔐 Password Reset Code - Nandha Notes",
       html: `
@@ -273,6 +273,11 @@ app.post("/request-reset", async (req, res) => {
         </div>
       `,
     });
+
+    if (error) {
+      console.error("Resend error:", error);
+      return res.status(500).json({ message: "Failed to send reset code." });
+    }
 
     res.json({ message: "Reset code sent to your email." });
   } catch (err) {
@@ -550,7 +555,6 @@ const getFileTypeFromName = (fileName) => {
   return 'pdf'; // default
 };
 
-// ✅ UPDATED: Upload Note Route with 10MB limit and GitHub
 // ✅ UPDATED: Upload Note Route with GitHub + Email Notifications
 app.post("/upload-note", upload.single("file"), async (req, res) => {
   try {
@@ -651,7 +655,6 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
   }
 });
 
-
 // ✅ Route: Get All Notes
 app.get("/get-notes", async (req, res) => {
   try {
@@ -679,8 +682,6 @@ app.get("/get-notes", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch notes" });
   }
 });
-
-
 
 // ✅ Test GitHub Connection Route
 app.get("/test-github", async (req, res) => {
@@ -710,7 +711,6 @@ app.get("/test-github", async (req, res) => {
   }
 });
 
-
 // ✅ Function to check if user allows email notifications
 const checkEmailNotificationsAllowed = async (email) => {
   try {
@@ -722,9 +722,7 @@ const checkEmailNotificationsAllowed = async (email) => {
   }
 };
 
-
-// ✅ Updated function to send channel upload notifications with preference check
-// ✅ Channel Upload Notification Email — Styled like Password Reset (Teal Theme)
+// ✅ Channel Upload Notification Email using Resend
 const sendChannelUploadNotification = async (uploader, channel, note, channelMembers) => {
   try {
     const uploaderEmail = uploader.email || uploader;
@@ -751,9 +749,10 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
 
     const appBaseUrl = "https://nandha-notes.netlify.app/"; // ⚙ Update this when deployed
 
+    // Send emails to all valid recipients
     for (const member of validRecipients) {
-      await transporter.sendMail({
-        from: '"Nandha Notes" <balasanjeevswathi1001@gmail.com>',
+      const { data, error } = await resend.emails.send({
+        from: 'Nandha Notes <onboarding@resend.dev>',
         to: member.email,
         subject: 📚 New Notes Uploaded in ${channel.name} - Nandha Notes,
         html: `
@@ -813,7 +812,12 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
           </div>
         `,
       });
-      console.log(✅ Channel upload notification sent to ${member.email});
+
+      if (error) {
+        console.error(❌ Failed to send email to ${member.email}:, error);
+      } else {
+        console.log(✅ Channel upload notification sent to ${member.email});
+      }
     }
 
     console.log(✅ All upload notifications sent for channel "${channel.name}");
@@ -821,6 +825,5 @@ const sendChannelUploadNotification = async (uploader, channel, note, channelMem
     console.error("❌ Error in sendChannelUploadNotification:", err);
   }
 };
-
 
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
