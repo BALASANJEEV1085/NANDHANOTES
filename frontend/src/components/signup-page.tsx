@@ -95,7 +95,7 @@ export function SignupPage({ onSignup, onNavigateToLogin }: SignupPageProps) {
     // Check if user already exists
     try {
       setLoading(true);
-      const checkRes = await fetch('http://localhost:5000/check-email', {
+      const checkRes = await fetch('https://nandhanotes.onrender.com/check-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -133,7 +133,7 @@ export function SignupPage({ onSignup, onNavigateToLogin }: SignupPageProps) {
 
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/signup', {
+      const res = await fetch('https://nandhanotes.onrender.com/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -150,7 +150,7 @@ export function SignupPage({ onSignup, onNavigateToLogin }: SignupPageProps) {
       const data = await res.json();
       
       if (res.ok) {
-        toast.success('🎉 Account created successfully! Remember your security answers for password recovery.');
+        toast.success('Account created successfully!');
         // Wait briefly so toast shows before redirecting to login
         setTimeout(() => {
           setShowSecurityQuestions(false);
@@ -522,11 +522,7 @@ export function SignupPage({ onSignup, onNavigateToLogin }: SignupPageProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 >
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                  />
+                  
                   Checking...
                 </motion.div>
               ) : (
@@ -639,11 +635,7 @@ export function SignupPage({ onSignup, onNavigateToLogin }: SignupPageProps) {
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                    />
+                    
                     Creating...
                   </div>
                 ) : (

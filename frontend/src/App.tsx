@@ -112,7 +112,7 @@ export default function App() {
   const fetchNotes = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch('http://localhost:5000/get-notes');
+      const res = await fetch('https://nandhanotes.onrender.com/get-notes');
       if (res.ok) {
         const serverNotes = await res.json();
         const transformedNotes = serverNotes.map((note: any) => ({
@@ -167,7 +167,7 @@ export default function App() {
     if (!user?.email) return;
     
     try {
-      const res = await fetch(`http://localhost:5000/user-channels/${user.email}`);
+      const res = await fetch(`https://nandhanotes.onrender.com/user-channels/${user.email}`);
       if (res.ok) {
         const serverChannels = await res.json();
         setChannels(serverChannels);
@@ -182,7 +182,7 @@ export default function App() {
   // Fetch user data from server
   const fetchUserData = async (email: string) => {
     try {
-      const res = await fetch(`http://localhost:5000/user/${email}`);
+      const res = await fetch(`https://nandhanotes.onrender.com/user/${email}`);
       if (res.ok) {
         const userData = await res.json();
         return userData;
@@ -196,7 +196,7 @@ export default function App() {
   // Fetch channel details
   const fetchChannelDetails = async (channelId: string) => {
     try {
-      const res = await fetch(`http://localhost:5000/channel/${channelId}`);
+      const res = await fetch(`https://nandhanotes.onrender.com/channel/${channelId}`);
       if (res.ok) {
         const channelData = await res.json();
         return channelData;
@@ -239,7 +239,7 @@ export default function App() {
       formData.append('channel', noteData.channel);
       formData.append('uploadedBy', user.email);
 
-      const res = await fetch('http://localhost:5000/upload-note', {
+      const res = await fetch('https://nandhanotes.onrender.com/upload-note', {
         method: 'POST',
         body: formData,
       });
@@ -274,7 +274,7 @@ export default function App() {
   // CREATE CHANNEL - FIXED
   const handleCreateChannel = async (name: string) => {
     try {
-      const res = await fetch('http://localhost:5000/create-channel', {
+      const res = await fetch('https://nandhanotes.onrender.com/create-channel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -303,7 +303,7 @@ export default function App() {
   // JOIN CHANNEL - FIXED
   const handleJoinChannel = async (code: string) => {
     try {
-      const res = await fetch('http://localhost:5000/join-channel', {
+      const res = await fetch('https://nandhanotes.onrender.com/join-channel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -332,7 +332,7 @@ export default function App() {
   // KICK USER - FIXED
   const handleKickUser = async (userId: string) => {
     try {
-      const res = await fetch('http://localhost:5000/remove-user-from-channel', {
+      const res = await fetch('https://nandhanotes.onrender.com/remove-user-from-channel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -242,11 +242,11 @@ export function LandingPage({
               <span className="stat-label">Students</span>
             </div>
             <div className="stat">
-              <span className="stat-number">5000+</span>
+              <span className="stat-number">500+</span>
               <span className="stat-label">Notes Shared</span>
             </div>
             <div className="stat">
-              <span className="stat-number">100+</span>
+              <span className="stat-number">50+</span>
               <span className="stat-label">Study Groups</span>
             </div>
           </div>

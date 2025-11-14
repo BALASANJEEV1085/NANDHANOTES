@@ -206,7 +206,7 @@ export function NoteViewer({ note, onClose, onDownloadNote }: NoteViewerProps) {
             </div>
             <button
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+              className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 cursor-pointer"
             >
               <X className="w-6 h-6" />
             </button>
@@ -243,14 +243,7 @@ export function NoteViewer({ note, onClose, onDownloadNote }: NoteViewerProps) {
               >
                 {isDownloading ? (
                   <>
-                    <OrbitProgress
-                      variant="disc"
-                      dense
-                      color="#32cd32"
-                      size="medium"
-                      text=""
-                      textColor=""
-                    />
+                    
                     Downloading...
                   </>
                 ) : (

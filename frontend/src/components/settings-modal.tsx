@@ -48,22 +48,7 @@ export function SettingsModal({ open, onClose, isDarkMode, onToggleTheme, userEm
           </div>
 
           {/* Email Notifications Info */}
-          <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-            <div className="space-y-1">
-              <Label className="text-blue-800 dark:text-blue-300 flex items-center gap-2">
-                <Bell className="w-4 h-4" />
-                Email Notifications
-              </Label>
-              <p className="text-sm text-blue-700 dark:text-blue-400">
-                You will receive email notifications when notes are uploaded to your channels. 
-                This helps you stay updated with new study materials.
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-500 mt-2">
-                🔔 Notifications are automatically sent to all channel members
-              </p>
-            </div>
-          </div>
+          
         </div>
       </DialogContent>
     </Dialog>

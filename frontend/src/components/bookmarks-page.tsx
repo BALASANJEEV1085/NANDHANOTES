@@ -39,7 +39,7 @@ export function BookmarksPage({ onViewNote, onToggleBookmark, onDownloadNote }: 
     try {
       setLoading(true);
       // First fetch all notes from backend
-      const res = await fetch('http://localhost:5000/get-notes');
+      const res = await fetch('https://nandhanotes.onrender.com/get-notes');
       if (res.ok) {
         const notesData = await res.json();
         

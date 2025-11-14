@@ -54,7 +54,7 @@ export function JoinChannelModal({ open, onClose, onJoin, currentUser }: JoinCha
     setLoading(true);
     
     try {
-      const res = await fetch('http://localhost:5000/join-channel', {
+      const res = await fetch('https://nandhanotes.onrender.com/join-channel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

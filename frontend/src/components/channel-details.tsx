@@ -74,7 +74,7 @@ export function ChannelDetails({
   useEffect(() => {
     const fetchChannelDetails = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/channel/${channel.id}`);
+        const res = await fetch(`https://nandhanotes.onrender.com/channel/${channel.id}`);
         if (res.ok) {
           const data = await res.json();
           setChannelData(data.channel);
@@ -126,7 +126,7 @@ export function ChannelDetails({
 
     try {
       setIsRemoving(true);
-      const res = await fetch('http://localhost:5000/remove-user-from-channel', {
+      const res = await fetch('https://nandhanotes.onrender.com/remove-user-from-channel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

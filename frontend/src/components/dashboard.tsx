@@ -44,7 +44,7 @@ export function Dashboard({ onViewNote, onToggleBookmark, refreshTrigger }: Dash
   const fetchNotes = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/get-notes');
+      const res = await fetch('https://nandhanotes.onrender.com/get-notes');
       if (res.ok) {
         const notesData = await res.json();
         
@@ -267,7 +267,7 @@ export function Dashboard({ onViewNote, onToggleBookmark, refreshTrigger }: Dash
                   </div>
                   <button
                     onClick={() => handleToggleBookmark(note.id)}
-                    className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0 ml-1"
+                    className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0 ml-1 cursor-pointer"
                   >
                     {note.isBookmarked ? (
                       <BookmarkCheck className="w-4 h-4 sm:w-5 sm:h-5 fill-primary text-primary" />
@@ -294,7 +294,7 @@ export function Dashboard({ onViewNote, onToggleBookmark, refreshTrigger }: Dash
                 <Button
                   size="sm"
                   onClick={() => onViewNote(note)}
-                  className="text-xs sm:text-sm px-2 sm:px-3 flex-shrink-0"
+                  className="text-xs sm:text-sm px-2 sm:px-3 flex-shrink-0 cursor-pointer"
                 >
                   View
                 </Button>

@@ -28,7 +28,7 @@ export function ProfilePage({ user, onLogout }: ProfilePageProps) {
     const fetchUserData = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`http://localhost:5000/user/${user.email}`);
+        const res = await fetch(`https://nandhanotes.onrender.com/user/${user.email}`);
         if (res.ok) {
           const latestUserData = await res.json();
           setUserData(latestUserData);

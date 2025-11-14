@@ -54,7 +54,7 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
 
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/get-security-questions', {
+      const res = await fetch('https://nandhanotes.onrender.com/get-security-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -85,7 +85,7 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
 
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/verify-security-answers', {
+      const res = await fetch('https://nandhanotes.onrender.com/verify-security-answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -123,7 +123,7 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
 
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/update-password', {
+      const res = await fetch('https://nandhanotes.onrender.com/update-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, newPassword }),
