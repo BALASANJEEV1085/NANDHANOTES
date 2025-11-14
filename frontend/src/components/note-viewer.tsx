@@ -27,6 +27,8 @@ interface NoteViewerProps {
 
 export function NoteViewer({ note, onClose, onDownloadNote }: NoteViewerProps) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [iframeLoading, setIframeLoading] = useState(true);
+  const [iframeError, setIframeError] = useState(false);
 
   if (!note) return null;
 
@@ -56,6 +58,21 @@ export function NoteViewer({ note, onClose, onDownloadNote }: NoteViewerProps) {
     }
   };
 
+  const handleIframeLoad = () => {
+    setIframeLoading(false);
+    setIframeError(false);
+  };
+
+  const handleIframeError = () => {
+    setIframeLoading(false);
+    setIframeError(true);
+  };
+
+  const resetIframeState = () => {
+    setIframeLoading(true);
+    setIframeError(false);
+  };
+
   const renderFilePreview = () => {
     if (!note.fileUrl) {
       return (
@@ -63,50 +80,6 @@ export function NoteViewer({ note, onClose, onDownloadNote }: NoteViewerProps) {
           <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>File not available for preview</p>
         </div>
-      );
-    }
-
-    // ✅ PDF Preview
-    if (note.fileType === 'pdf') {
-      const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(note.fileUrl)}&embedded=true`;
-      return (
-        <iframe
-          src={viewerUrl}
-          className="w-full h-[calc(100vh-300px)] border-0 rounded-lg"
-          title={note.title}
-        />
-      );
-    }
-
-    // ✅ PPT / PPTX Preview (Google Viewer fallback to Office)
-    if (note.fileType === 'ppt') {
-      const googleViewer = `https://docs.google.com/gview?url=${encodeURIComponent(note.fileUrl)}&embedded=true`;
-      const officeViewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(note.fileUrl)}`;
-      return (
-        <iframe
-          src={googleViewer}
-          className="w-full h-[calc(100vh-300px)] border-0 rounded-lg"
-          title={note.title}
-          onError={(e: any) => {
-            e.target.src = officeViewer;
-          }}
-        />
-      );
-    }
-
-    // ✅ DOC / DOCX Preview (Google Viewer fallback to Office)
-    if (note.fileType === 'doc') {
-      const googleViewer = `https://docs.google.com/gview?url=${encodeURIComponent(note.fileUrl)}&embedded=true`;
-      const officeViewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(note.fileUrl)}`;
-      return (
-        <iframe
-          src={googleViewer}
-          className="w-full h-[calc(100vh-300px)] border-0 rounded-lg"
-          title={note.title}
-          onError={(e: any) => {
-            e.target.src = officeViewer;
-          }}
-        />
       );
     }
 
@@ -120,6 +93,62 @@ export function NoteViewer({ note, onClose, onDownloadNote }: NoteViewerProps) {
             className="max-w-full max-h-[calc(100vh-300px)] object-contain rounded-lg"
             onContextMenu={(e) => e.preventDefault()}
           />
+        </div>
+      );
+    }
+
+    // ✅ PDF, PPT, DOC Preview with iframe
+    if (['pdf', 'ppt', 'doc'].includes(note.fileType)) {
+      let viewerUrl = '';
+      
+      if (note.fileType === 'pdf') {
+        viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(note.fileUrl)}&embedded=true`;
+      } else {
+        // For PPT and DOC, try Google Docs viewer first
+        viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(note.fileUrl)}&embedded=true`;
+      }
+
+      return (
+        <div className="relative w-full h-[calc(100vh-300px)]">
+          {iframeLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg">
+              <div className="text-center">
+                <OrbitProgress
+                  variant="disc"
+                  dense
+                  color="#32cd32"
+                  size="medium"
+                  text=""
+                  textColor=""
+                />
+                <p className="mt-2 text-sm text-muted-foreground">Loading preview...</p>
+              </div>
+            </div>
+          )}
+          
+          {iframeError ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-lg">
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Preview failed to load</p>
+                <Button 
+                  variant="outline" 
+                  className="mt-2"
+                  onClick={resetIframeState}
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <iframe
+              src={viewerUrl}
+              className="w-full h-full border-0 rounded-lg"
+              title={note.title}
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+            />
+          )}
         </div>
       );
     }
@@ -204,7 +233,7 @@ export function NoteViewer({ note, onClose, onDownloadNote }: NoteViewerProps) {
             <div className="border-t pt-4 flex justify-between items-center">
               <div>
                 <p className="text-sm text-muted-foreground">Uploaded by</p>
-                <p>{note.uploadedBy}</p>
+                <p className="text-sm">{note.uploadedBy}</p>
                 <p className="text-xs text-muted-foreground">{note.uploadDate}</p>
               </div>
               <Button

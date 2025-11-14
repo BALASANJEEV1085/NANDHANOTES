@@ -2,7 +2,6 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import bodyParser from "body-parser";
-import nodemailer from "nodemailer";
 import multer from "multer";
 import { Octokit } from '@octokit/rest';
 import dotenv from 'dotenv';
@@ -14,13 +13,12 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ✅ Connect MongoDB Atlas
-mongoose
-  .connect(
-    "mongodb+srv://balasanjeev:balasanjeev@cluster0.vvgdhov.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
-    { useNewUrlParser: true, useUnifiedTopology: true }
-  )
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.error("❌ MongoDB Error:", err));
+mongoose.connect(
+  process.env.MONGODB_URI || "mongodb+srv://balasanjeev:balasanjeev@cluster0.vvgdhov.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
+  { useNewUrlParser: true, useUnifiedTopology: true }
+)
+.then(() => console.log("✅ MongoDB Connected"))
+.catch((err) => console.error("❌ MongoDB Error:", err));
 
 // ✅ GitHub Configuration
 const octokit = new Octokit({
@@ -46,18 +44,16 @@ const userSchema = new mongoose.Schema({
   username: String,
   email: String,
   password: String,
-  verificationCode: String,
-  verified: { type: Boolean, default: false },
-  resetCode: String,
+  securityQuestion1: String,
+  securityAnswer1: String,
+  securityQuestion2: String,
+  securityAnswer2: String,
+  verified: { type: Boolean, default: true }, // Auto-verify since no email verification
   credits: { type: Number, default: 0 },
   uploadCount: { type: Number, default: 0 },
   uploadedNotes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Note' }],
   joinedChannels: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Channel' }],
-  
-  // ✅ Add this field
-  allowEmailNotifications: { type: Boolean, default: true }
 });
-
 
 const User = mongoose.model("User", userSchema);
 
@@ -95,80 +91,50 @@ const channelSchema = new mongoose.Schema({
 
 const Channel = mongoose.model("Channel", channelSchema);
 
-// ✅ Email Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "balasanjeevswathi1001@gmail.com",
-    pass: "swgu sgcb trta wxqo",
-  },
+// ✅ Route: Check if email exists
+app.post("/check-email", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const existing = await User.findOne({ email });
+    res.json({ exists: !!existing });
+  } catch (err) {
+    console.error("❌ Check email error:", err);
+    res.status(500).json({ message: "Error checking email" });
+  }
 });
 
 // ✅ Route: Signup
 app.post("/signup", async (req, res) => {
-  const { username, email, password } = req.body;
-  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const { username, email, password, securityQuestion1, securityAnswer1, securityQuestion2, securityAnswer2 } = req.body;
 
   try {
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: "Email already registered" });
 
-    const newUser = new User({ username, email, password, verificationCode });
+    const newUser = new User({ 
+      username, 
+      email, 
+      password, 
+      securityQuestion1,
+      securityAnswer1: securityAnswer1.toLowerCase().trim(),
+      securityQuestion2,
+      securityAnswer2: securityAnswer2.toLowerCase().trim(),
+      verified: true // Auto-verify since no email verification
+    });
     await newUser.save();
 
-    await transporter.sendMail({
-      from: '"Nandha Notes" <your_email@gmail.com>',
-      to: email,
-      subject: "📚 Verify your Nandha Notes Account",
-      html: `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
-          <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            <div style="background-color: #16a34a; padding: 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 24px;">📚 Nandha Notes</h1>
-            </div>
-            <div style="padding: 30px; text-align: center;">
-              <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Verify Your Email Address</h2>
-              <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-                Hello 👋, thank you for signing up for <strong>Nandha Notes</strong>.<br>
-                To complete your registration, please use the verification code below:
-              </p>
-              <div style="display: inline-block; padding: 15px 30px; background-color: #16a34a; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
-                ${verificationCode}
-              </div>
-              <p style="color: #777777; font-size: 14px; margin-top: 20px;">
-                This code will expire in 10 minutes. Please do not share it with anyone.
-              </p>
-            </div>
-            <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
-              <p style="margin: 0;">
-                © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
-              </p>
-            </div>
-          </div>
-        </div>
-      `,
+    res.json({ 
+      message: "Account created successfully! Remember your security answers for password recovery.",
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email
+      }
     });
-
-    res.json({ message: "Verification code sent successfully" });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to send verification code" });
-  }
-});
-
-// ✅ Route: Verify Signup
-app.post("/verify", async (req, res) => {
-  const { email, code } = req.body;
-
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: "User not found" });
-
-  if (user.verificationCode === code) {
-    user.verified = true;
-    await user.save();
-    res.json({ message: "Account verified successfully" });
-  } else {
-    res.status(400).json({ message: "Invalid verification code" });
+    console.error("❌ Signup error:", err);
+    res.status(500).json({ message: "Failed to create account" });
   }
 });
 
@@ -181,10 +147,6 @@ app.post("/login", async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "No account found. Please sign up first." });
-    }
-
-    if (!user.verified) {
-      return res.status(403).json({ message: "Your email is not verified. Please verify it first." });
     }
 
     if (user.password !== password) {
@@ -202,7 +164,7 @@ app.post("/login", async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("❌ Login error:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
@@ -222,76 +184,52 @@ app.get("/user/:email", async (req, res) => {
       uploadCount: user.uploadCount
     });
   } catch (err) {
-    console.error("Get user error:", err);
+    console.error("❌ Get user error:", err);
     res.status(500).json({ message: "Error fetching user data" });
   }
 });
 
-// ✅ Route: Request Password Reset
-app.post("/request-reset", async (req, res) => {
+// ✅ Route: Get Security Questions
+app.post("/get-security-questions", async (req, res) => {
   const { email } = req.body;
 
   try {
     const user = await User.findOne({ email });
-    if (!user)
+    if (!user) {
       return res.status(404).json({ message: "No account found with that email." });
+    }
 
-    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    user.resetCode = resetCode;
-    await user.save();
-
-    await transporter.sendMail({
-      from: '"Nandha Notes" <your_email@gmail.com>',
-      to: email,
-      subject: "🔐 Password Reset Code - Nandha Notes",
-      html: `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
-          <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            <div style="background-color: #dc2626; padding: 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 24px;">🔐 Nandha Notes</h1>
-            </div>
-            <div style="padding: 30px; text-align: center;">
-              <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Password Reset Request</h2>
-              <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-                We received a request to reset your password for your <strong>Nandha Notes</strong> account.
-                Use the code below to reset your password:
-              </p>
-              <div style="display: inline-block; padding: 15px 30px; background-color: #dc2626; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
-                ${resetCode}
-              </div>
-              <p style="color: #777777; font-size: 14px; margin-top: 20px;">
-                This code will expire in 10 minutes.<br>
-                If you didn't request this, you can safely ignore this email.
-              </p>
-            </div>
-            <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
-              <p style="margin: 0;">
-                © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
-              </p>
-            </div>
-          </div>
-        </div>
-      `,
+    res.json({
+      securityQuestion1: user.securityQuestion1,
+      securityQuestion2: user.securityQuestion2
     });
-
-    res.json({ message: "Reset code sent to your email." });
   } catch (err) {
-    console.error("Reset error:", err);
-    res.status(500).json({ message: "Failed to send reset code." });
+    console.error("❌ Get security questions error:", err);
+    res.status(500).json({ message: "Failed to get security questions" });
   }
 });
 
-// ✅ Route: Verify Reset Code
-app.post("/verify-reset", async (req, res) => {
-  const { email, code } = req.body;
+// ✅ Route: Verify Security Answers
+app.post("/verify-security-answers", async (req, res) => {
+  const { email, securityAnswer1, securityAnswer2 } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: "User not found" });
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-  if (user.resetCode === code) {
-    res.json({ message: "Code verified successfully" });
-  } else {
-    res.status(400).json({ message: "Invalid reset code" });
+    const answer1Match = user.securityAnswer1 === securityAnswer1.toLowerCase().trim();
+    const answer2Match = user.securityAnswer2 === securityAnswer2.toLowerCase().trim();
+
+    if (answer1Match && answer2Match) {
+      res.json({ message: "Security answers verified successfully" });
+    } else {
+      res.status(400).json({ message: "Incorrect security answers" });
+    }
+  } catch (err) {
+    console.error("❌ Security answers verification error:", err);
+    res.status(500).json({ message: "Security answers verification failed" });
   }
 });
 
@@ -304,11 +242,11 @@ app.post("/update-password", async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.password = newPassword;
-    user.resetCode = null;
     await user.save();
 
     res.json({ message: "Password updated successfully!" });
   } catch (err) {
+    console.error("❌ Password update error:", err);
     res.status(500).json({ message: "Error updating password." });
   }
 });
@@ -537,12 +475,11 @@ app.post("/remove-user-from-channel", async (req, res) => {
   }
 });
 
-// ✅ FIXED: Helper function to determine file type (CORRECT ORDER)
+// ✅ Helper function to determine file type
 const getFileTypeFromName = (fileName) => {
   if (!fileName) return 'pdf';
   const nameLower = fileName.toLowerCase();
   
-  // Check in correct order - most specific first
   if (nameLower.endsWith('.pdf')) return 'pdf';
   if (nameLower.endsWith('.ppt') || nameLower.endsWith('.pptx')) return 'ppt';
   if (nameLower.endsWith('.jpg') || nameLower.endsWith('.jpeg') || nameLower.endsWith('.png')) return 'image';
@@ -550,8 +487,7 @@ const getFileTypeFromName = (fileName) => {
   return 'pdf'; // default
 };
 
-// ✅ UPDATED: Upload Note Route with 10MB limit and GitHub
-// ✅ UPDATED: Upload Note Route with GitHub + Email Notifications
+// ✅ Upload Note Route
 app.post("/upload-note", upload.single("file"), async (req, res) => {
   try {
     const { regulation, year, topic, subject, subjectCode, description, channel, uploadedBy } = req.body;
@@ -614,24 +550,13 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
       await user.save();
     }
 
-    // ✅ If uploaded to a channel, notify all members
+    // If uploaded to a channel, add note to channel
     if (channel && channel !== "none") {
       const channelDoc = await Channel.findById(channel);
       if (channelDoc) {
         channelDoc.notes.push(note._id);
         await channelDoc.save();
-
-        try {
-          const uploader = await User.findOne({ email: uploadedBy });
-          const channelMembers = channelDoc.members;
-
-          console.log(`📢 Sending email notifications for upload in channel "${channelDoc.name}"...`);
-          await sendChannelUploadNotification(uploader, channelDoc, note, channelMembers);
-        } catch (notifyErr) {
-          console.error("❌ Failed to send upload notifications:", notifyErr);
-        }
-      } else {
-        console.warn("⚠️ Channel not found, skipping notification");
+        console.log(`✅ Note added to channel "${channelDoc.name}"`);
       }
     }
 
@@ -651,13 +576,11 @@ app.post("/upload-note", upload.single("file"), async (req, res) => {
   }
 });
 
-
 // ✅ Route: Get All Notes
 app.get("/get-notes", async (req, res) => {
   try {
     const notes = await Note.find().sort({ uploadedAt: -1 });
     
-    // Transform notes for frontend
     const transformedNotes = notes.map(note => ({
       _id: note._id,
       fileName: note.fileName,
@@ -670,7 +593,7 @@ app.get("/get-notes", async (req, res) => {
       description: note.description,
       uploadedBy: note.uploadedBy,
       uploadedAt: note.uploadedAt,
-      fileType: getFileTypeFromName(note.fileName) // Use the same function
+      fileType: getFileTypeFromName(note.fileName)
     }));
     
     res.json(transformedNotes);
@@ -680,14 +603,11 @@ app.get("/get-notes", async (req, res) => {
   }
 });
 
-
-
 // ✅ Test GitHub Connection Route
 app.get("/test-github", async (req, res) => {
   try {
     console.log("🔍 Testing GitHub connection...");
     
-    // Test if we can access the repo
     const { data } = await octokit.repos.get({
       owner: GITHUB_OWNER,
       repo: GITHUB_REPO
@@ -709,118 +629,5 @@ app.get("/test-github", async (req, res) => {
     });
   }
 });
-
-
-// ✅ Function to check if user allows email notifications
-const checkEmailNotificationsAllowed = async (email) => {
-  try {
-    const user = await User.findOne({ email });
-    return user?.allowEmailNotifications !== false;
-  } catch (err) {
-    console.error("Preference lookup failed:", err);
-    return true;
-  }
-};
-
-
-// ✅ Updated function to send channel upload notifications with preference check
-// ✅ Channel Upload Notification Email — Styled like Password Reset (Teal Theme)
-const sendChannelUploadNotification = async (uploader, channel, note, channelMembers) => {
-  try {
-    const uploaderEmail = uploader.email || uploader;
-    const uploaderName = uploader.username || "A user";
-
-    // Exclude the uploader from the recipients
-    const recipients = channelMembers.filter(m => m.email !== uploaderEmail);
-    if (recipients.length === 0) {
-      console.log("📧 No recipients to notify (only uploader in channel)");
-      return;
-    }
-
-    const validRecipients = [];
-    for (const member of recipients) {
-      const allows = await checkEmailNotificationsAllowed(member.email);
-      if (allows) validRecipients.push(member);
-      else console.log(`📪 Skipping ${member.email} (notifications disabled)`);
-    }
-
-    if (validRecipients.length === 0) {
-      console.log("📭 No members have notifications enabled");
-      return;
-    }
-
-    const appBaseUrl = "http://localhost:3000"; // ⚙️ Update this when deployed
-
-    for (const member of validRecipients) {
-      await transporter.sendMail({
-        from: '"Nandha Notes" <balasanjeevswathi1001@gmail.com>',
-        to: member.email,
-        subject: `📚 New Notes Uploaded in ${channel.name} - Nandha Notes`,
-        html: `
-          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
-            <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-              
-              <!-- Header -->
-              <div style="background-color: #15b8a6; padding: 20px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 24px;">📚 Nandha Notes</h1>
-              </div>
-
-              <!-- Body -->
-              <div style="padding: 30px; text-align: center;">
-                <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">New Notes Uploaded</h2>
-                <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-                  <strong>${uploaderName}</strong> has uploaded new notes to your channel
-                  <strong>${channel.name}</strong>.
-                </p>
-
-                <!-- Note Details -->
-                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; text-align: left; margin-bottom: 25px;">
-                  <h3 style="color: #15b8a6; margin-top: 0; margin-bottom: 10px;">📖 Note Details</h3>
-                  <p style="margin: 5px 0; color: #333;"><strong>Title:</strong> ${note.topic || note.fileName}</p>
-                  <p style="margin: 5px 0; color: #333;"><strong>Subject:</strong> ${note.subject} (${note.subjectCode})</p>
-                  <p style="margin: 5px 0; color: #333;"><strong>Regulation:</strong> ${note.regulation}</p>
-                  <p style="margin: 5px 0; color: #333;"><strong>Year:</strong> ${note.year}</p>
-                  <p style="margin: 5px 0; color: #333;"><strong>Description:</strong> ${note.description || "No description provided"}</p>
-                </div>
-
-                <!-- Buttons -->
-                <div style="margin-bottom: 25px;">
-                  <a href="${appBaseUrl}/notes/${note._id}"
-   style="display: inline-block; padding: 12px 24px; background-color: #15b8a6; color: #ffffff; border-radius: 8px; text-decoration: none; font-weight: bold; margin-right: 10px;">
-   📥 View Notes
-</a>
-
-                  <a href="${appBaseUrl}/channels/${channel._id}"
-                     style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; border-radius: 8px; text-decoration: none; font-weight: bold;">
-                     🔗 Open Channel
-                  </a>
-                </div>
-
-                <p style="color: #777777; font-size: 14px; margin-top: 15px;">
-                  You are receiving this email because you are a member of <strong>${channel.name}</strong>.<br>
-                  Manage your notification preferences in your account settings.
-                </p>
-              </div>
-
-              <!-- Footer -->
-              <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
-                <p style="margin: 0;">
-                  © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
-                  <a href="${appBaseUrl}/settings" style="color: #15b8a6; text-decoration: none;">Manage Notification Preferences</a>
-                </p>
-              </div>
-            </div>
-          </div>
-        `,
-      });
-      console.log(`✅ Channel upload notification sent to ${member.email}`);
-    }
-
-    console.log(`✅ All upload notifications sent for channel "${channel.name}"`);
-  } catch (err) {
-    console.error("❌ Error in sendChannelUploadNotification:", err);
-  }
-};
-
 
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));

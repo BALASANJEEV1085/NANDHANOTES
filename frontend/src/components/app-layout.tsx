@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 import { Home, Users, BookmarkCheck, User, Settings, Upload, Menu, BookOpen, TextCursor } from 'lucide-react';
+import logo from '../assests/logo.png';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -39,7 +40,12 @@ export function AppLayout({
       <div className="p-6 border-b">
         <div className="flex items-center gap-3">
           <div className="bg-primary w-10 h-10 rounded-lg flex items-center justify-center">
-            <BookOpen className="w-6 h-6 text-primary-foreground" />
+            <img 
+  src={logo}
+  alt="Nandha Notes Logo"
+  className="w-full h-full object-cover rounded-lg"
+/>
+
           </div>
           <div>
             <h2 className="text-lg">Nandha Notes</h2>
@@ -115,7 +121,11 @@ export function AppLayout({
 
               <div className="flex items-center gap-3 md:hidden">
                 <div className="bg-primary w-8 h-8 rounded-lg flex items-center justify-center">
-                  <BookOpen className="w-5 h-5 text-primary-foreground" />
+                  <img 
+              src={logo}
+              alt="Nandha Notes Logo"
+              className="w-full h-full object-cover"
+            />
                 </div>
                 <div>
                   <h2 className="font-semibold">Nandha Notes</h2>

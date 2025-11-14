@@ -3,6 +3,15 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PasswordInput } from './ui/password-input';
+import logo from '../assests/logonandhanotes.png';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 import {
   Card,
   CardContent,
@@ -11,18 +20,36 @@ import {
   CardHeader,
   CardTitle,
 } from './ui/card';
-import { BookOpen, Check, X } from 'lucide-react';
+import { BookOpen, Check, X, Shield, ArrowLeft, AlertCircle, ChevronDown } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export function SignupPage({ onSignup, onNavigateToLogin }) {
+interface SignupPageProps {
+  onSignup: () => void;
+  onNavigateToLogin: () => void;
+}
+
+export function SignupPage({ onSignup, onNavigateToLogin }: SignupPageProps) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [showVerification, setShowVerification] = useState(false);
+  const [securityQuestion1, setSecurityQuestion1] = useState('What is your favorite animal?');
+  const [securityAnswer1, setSecurityAnswer1] = useState('');
+  const [securityQuestion2, setSecurityQuestion2] = useState("What is your pet's name?");
+  const [securityAnswer2, setSecurityAnswer2] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSecurityQuestions, setShowSecurityQuestions] = useState(false);
+
+  // Security questions options
+  const securityQuestions = [
+    'What is your favorite animal?',
+    "What is your pet's name?",
+    'What city were you born in?',
+    'What is your mother\'s maiden name?',
+    'What was your first school name?',
+    'What is your favorite movie?'
+  ];
 
   // Password requirements
   const passwordRequirements = {
@@ -40,9 +67,15 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
     passwordRequirements.hasNumber &&
     passwordRequirements.hasSpecialChar;
 
-  // --- Handle Signup ---
-  const handleSubmit = async (e: React.FormEvent) => {
+  // --- Handle Initial Signup Form ---
+  const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Basic validation
+    if (!username || !email || !password || !confirmPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
 
     if (!isPasswordValid) {
       toast.error('Password does not meet requirements!');
@@ -55,7 +88,46 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
     }
 
     if (!email.endsWith('@nandhaengg.org')) {
-      toast.error('Please use your domain mail');
+      toast.error('Please use your domain mail (@nandhaengg.org)');
+      return;
+    }
+
+    // Check if user already exists
+    try {
+      setLoading(true);
+      const checkRes = await fetch('http://localhost:5000/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      
+      if (!checkRes.ok) {
+        throw new Error('Failed to check email');
+      }
+      
+      const checkData = await checkRes.json();
+      
+      if (checkData.exists) {
+        toast.error('Email already registered. Please use a different email or login.');
+        setLoading(false);
+        return;
+      }
+
+      // Show security questions modal if email is available
+      setShowSecurityQuestions(true);
+    } catch (err) {
+      console.error('Error checking email:', err);
+      // If check fails, proceed to security questions anyway and let the signup endpoint handle duplication
+      setShowSecurityQuestions(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- Handle Final Signup with Security Questions ---
+  const handleFinalSignup = async () => {
+    if (!securityAnswer1.trim() || !securityAnswer2.trim()) {
+      toast.error('Please answer both security questions');
       return;
     }
 
@@ -64,54 +136,32 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
       const res = await fetch('http://localhost:5000/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password }),
+        body: JSON.stringify({ 
+          username, 
+          email, 
+          password, 
+          securityQuestion1, 
+          securityAnswer1: securityAnswer1.trim(),
+          securityQuestion2,
+          securityAnswer2: securityAnswer2.trim()
+        }),
       });
 
       const data = await res.json();
+      
       if (res.ok) {
-        toast.success('Verification code sent to your email!');
-        setShowVerification(true);
-      } else {
-        toast.error(data.message || 'Signup failed');
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('Server connection error.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- Handle Verification ---
-  const handleVerification = async () => {
-    if (!verificationCode) {
-      toast.error('Please enter the verification code.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await fetch('http://localhost:5000/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: verificationCode }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('Email verified successfully!');
-        // wait briefly so toast shows before redirecting to login
+        toast.success('🎉 Account created successfully! Remember your security answers for password recovery.');
+        // Wait briefly so toast shows before redirecting to login
         setTimeout(() => {
-          setShowVerification(false);
-          // Redirect to login page instead of calling onSignup
+          setShowSecurityQuestions(false);
           onNavigateToLogin();
-        }, 1500);
+        }, 2000);
       } else {
-        toast.error(data.message || 'Verification failed');
+        toast.error(data.message || 'Signup failed. Please try again.');
       }
     } catch (err) {
-      console.error(err);
-      toast.error('Error verifying code.');
+      console.error('Signup error:', err);
+      toast.error('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -192,26 +242,103 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
     );
   };
 
+  const handleCloseSecurityQuestions = () => {
+    setShowSecurityQuestions(false);
+  };
+
+  // Custom Select Component for Security Questions with Theme Colors
+  const CustomSelect = ({ 
+    value, 
+    onChange, 
+    options, 
+    disabled 
+  }: { 
+    value: string; 
+    onChange: (value: string) => void; 
+    options: string[]; 
+    disabled: boolean;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          className={`w-full p-3 border border-gray-300 rounded-lg text-left flex items-center justify-between transition-all duration-200 ${
+            disabled ? 'bg-gray-100 cursor-not-allowed opacity-60 text-gray-500' : 'hover:border-primary/60 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-background text-foreground'
+          } ${isOpen ? 'border-primary ring-2 ring-primary/20' : ''}`}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          disabled={disabled}
+        >
+          <span className="font-medium">{value}</span>
+          <motion.div
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </motion.div>
+        </button>
+
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              className="absolute z-50 w-full mt-1 border border-primary/20 rounded-lg shadow-lg max-h-60 overflow-y-auto bg-card text-card-foreground"
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+            >
+              {options.map((question, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  className={`w-full p-3 text-left transition-colors duration-150 ${
+                    value === question 
+                      ? 'bg-primary text-primary-foreground font-medium' 
+                      : 'hover:bg-accent hover:text-accent-foreground'
+                  } ${index !== options.length - 1 ? 'border-b border-border' : ''}`}
+                  onClick={() => {
+                    onChange(question);
+                    setIsOpen(false);
+                  }}
+                >
+                  {question}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 relative">
       <Toaster position="top-center" />
 
-      {/* --- Signup Card --- */}
-      <Card className="w-full max-w-md shadow-xl bg-white border border-gray-200">
+      {/* Back Button */}
+      
+
+      {/* --- Main Signup Card --- */}
+      <Card className="w-full max-w-md shadow-xl bg-card border border-border">
         <CardHeader className="space-y-3 text-center">
           <div className="mx-auto bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center">
-            <BookOpen className="w-8 h-8 text-primary" />
+            <img 
+              src={logo}
+              alt="Nandha Notes Logo"
+              className="w-full h-full object-cover"
+            />
           </div>
-          <CardTitle className="text-3xl">Join Nandha Notes</CardTitle>
+          <CardTitle className="text-3xl text-card-foreground">Join Nandha Notes</CardTitle>
           <CardDescription>
             Create your account to start sharing and accessing notes
           </CardDescription>
         </CardHeader>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleInitialSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="text-foreground">Username</Label>
               <Input
                 id="username"
                 type="text"
@@ -219,27 +346,33 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                disabled={loading}
+                className="bg-background text-foreground border-border"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">College Email</Label>
+              <Label htmlFor="email" className="text-foreground">College Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="Your domain mail"
+                placeholder="regno@nandhaengg.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
+                className="bg-background text-foreground border-border"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-foreground">Password</Label>
               <PasswordInput
                 id="password"
                 placeholder="Create a password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
+                className="bg-background text-foreground border-border"
               />
               
               {/* Password Requirements with Animations */}
@@ -324,13 +457,15 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
               </AnimatePresence>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
               <PasswordInput
                 id="confirmPassword"
                 placeholder="Confirm your password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                disabled={loading}
+                className="bg-background text-foreground border-border"
               />
               
               {/* Password Match Indicator */}
@@ -379,7 +514,7 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
             <Button 
               type="submit" 
               className="w-full cursor-pointer" 
-              disabled={loading || !isPasswordValid || password !== confirmPassword}
+              disabled={loading || !isPasswordValid || password !== confirmPassword || !username || !email}
             >
               {loading ? (
                 <motion.div
@@ -392,7 +527,7 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
                   />
-                  Creating Account...
+                  Checking...
                 </motion.div>
               ) : (
                 'Create Account'
@@ -404,6 +539,7 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
                 type="button"
                 onClick={onNavigateToLogin}
                 className="text-primary hover:underline cursor-pointer"
+                disabled={loading}
               >
                 Sign in
               </button>
@@ -412,87 +548,112 @@ export function SignupPage({ onSignup, onNavigateToLogin }) {
         </form>
       </Card>
 
-      {/* --- OTP Verification Modal --- */}
-      <AnimatePresence>
-        {showVerification && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="w-full max-w-md mx-4"
-            >
-              <Card className="w-full bg-card shadow-2xl border">
-                <CardHeader className="space-y-3 text-center">
-                  <div className="mx-auto bg-primary/10 w-14 h-14 rounded-full flex items-center justify-center">
-                    <BookOpen className="w-7 h-7 text-primary" />
-                  </div>
-                  <CardTitle className="text-2xl font-semibold">
-                    Verify Your Email
-                  </CardTitle>
-                  <CardDescription>
-                    Enter the 6-digit code sent to your <br />
-                    <span className="font-medium">{email}</span>
-                  </CardDescription>
-                </CardHeader>
+      {/* --- Security Questions Modal (Updated for Better Visibility) --- */}
+      <Dialog open={showSecurityQuestions} onOpenChange={handleCloseSecurityQuestions}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <div className="mx-auto bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+              <Shield className="w-6 h-6 text-primary" />
+            </div>
+            <DialogTitle className="text-card-foreground">Security Questions</DialogTitle>
+            <DialogDescription>
+              Set up security questions for password recovery
+            </DialogDescription>
+          </DialogHeader>
 
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="verificationCode">Verification Code</Label>
-                    <Input
-                      id="verificationCode"
-                      type="text"
-                      placeholder="Enter 6-digit code"
-                      value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value)}
-                      maxLength={6}
-                      className="text-center text-lg tracking-widest"
-                    />
+          <form onSubmit={(e) => { e.preventDefault(); handleFinalSignup(); }}>
+            <div className="space-y-4 py-4">
+              {/* Important Notice */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-amber-800 font-medium">
+                      Remember your answers! You'll need them to reset your password.
+                    </p>
                   </div>
-                </CardContent>
+                </div>
+              </div>
 
-                <CardFooter className="flex flex-col gap-3">
-                  <Button
-                    onClick={handleVerification}
-                    className="w-full cursor-pointer"
+              {/* Security Question 1 */}
+              <div className="space-y-2">
+                <Label htmlFor="security-question-1" className="text-sm font-medium text-card-foreground">
+                  Question 1
+                </Label>
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                  <CustomSelect
+                    value={securityQuestion1}
+                    onChange={setSecurityQuestion1}
+                    options={securityQuestions}
                     disabled={loading}
-                  >
-                    {loading ? (
-                      <motion.div
-                        className="flex items-center gap-2"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                      >
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                        />
-                        Verifying...
-                      </motion.div>
-                    ) : (
-                      'Verify Email'
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowVerification(false)}
-                    className="w-full cursor-pointer"
-                  >
-                    Cancel
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Your answer"
+                  value={securityAnswer1}
+                  onChange={(e) => setSecurityAnswer1(e.target.value)}
+                  required
+                  className="bg-background text-foreground border-border mt-2"
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Security Question 2 */}
+              <div className="space-y-2">
+                <Label htmlFor="security-question-2" className="text-sm font-medium text-card-foreground">
+                  Question 2
+                </Label>
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                  <CustomSelect
+                    value={securityQuestion2}
+                    onChange={setSecurityQuestion2}
+                    options={securityQuestions}
+                    disabled={loading}
+                  />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Your answer"
+                  value={securityAnswer2}
+                  onChange={(e) => setSecurityAnswer2(e.target.value)}
+                  required
+                  className="bg-background text-foreground border-border mt-2"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleCloseSecurityQuestions}
+                disabled={loading}
+                className="border-border text-foreground hover:bg-accent"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={loading || !securityAnswer1.trim() || !securityAnswer2.trim()}
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                    />
+                    Creating...
+                  </div>
+                ) : (
+                  'Complete Signup'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

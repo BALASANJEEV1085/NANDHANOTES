@@ -11,7 +11,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PasswordInput } from './ui/password-input';
 import { Button } from './ui/button';
-import { Mail } from 'lucide-react';
+import { Shield, Lock } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 
 interface ResetPasswordModalProps {
@@ -21,11 +21,13 @@ interface ResetPasswordModalProps {
 
 export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
   const [email, setEmail] = useState('');
-  const [resetCode, setResetCode] = useState('');
+  const [securityAnswer1, setSecurityAnswer1] = useState('');
+  const [securityAnswer2, setSecurityAnswer2] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [step, setStep] = useState(1); // 1 = enter email, 2 = verify code, 3 = new password
+  const [step, setStep] = useState(1); // 1 = enter email, 2 = security questions, 3 = new password
   const [loading, setLoading] = useState(false);
+  const [securityQuestions, setSecurityQuestions] = useState({ question1: '', question2: '' });
 
   // Password requirements
   const passwordRequirements = {
@@ -43,7 +45,7 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
     passwordRequirements.hasNumber &&
     passwordRequirements.hasSpecialChar;
 
-  const handleRequestCode = async (e: React.FormEvent) => {
+  const handleGetSecurityQuestions = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.endsWith('@nandhaengg.org')) {
       toast.error('Please use your domain mail');
@@ -52,16 +54,21 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
 
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/request-reset', {
+      const res = await fetch('http://localhost:5000/get-security-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Reset code sent to your email!');
+        setSecurityQuestions({
+          question1: data.securityQuestion1,
+          question2: data.securityQuestion2
+        });
         setStep(2);
-      } else toast.error(data.message);
+      } else {
+        toast.error(data.message);
+      }
     } catch (err) {
       toast.error('Error connecting to server.');
     } finally {
@@ -69,22 +76,33 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
     }
   };
 
-  const handleVerifyCode = async (e: React.FormEvent) => {
+  const handleVerifySecurityAnswers = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!securityAnswer1 || !securityAnswer2) {
+      toast.error('Please answer both security questions');
+      return;
+    }
+
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/verify-reset', {
+      const res = await fetch('http://localhost:5000/verify-security-answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: resetCode }),
+        body: JSON.stringify({ 
+          email, 
+          securityAnswer1, 
+          securityAnswer2 
+        }),
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Code verified successfully!');
+        toast.success('Security answers verified successfully!');
         setStep(3);
-      } else toast.error(data.message);
+      } else {
+        toast.error(data.message);
+      }
     } catch (err) {
-      toast.error('Error verifying code.');
+      toast.error('Error verifying security answers.');
     } finally {
       setLoading(false);
     }
@@ -114,10 +132,12 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
       if (res.ok) {
         toast.success('Password updated successfully!');
         setTimeout(() => {
-          setStep(1);
+          resetForm();
           onClose();
         }, 1000);
-      } else toast.error(data.message);
+      } else {
+        toast.error(data.message);
+      }
     } catch (err) {
       toast.error('Error updating password.');
     } finally {
@@ -127,10 +147,12 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
 
   const resetForm = () => {
     setEmail('');
-    setResetCode('');
+    setSecurityAnswer1('');
+    setSecurityAnswer2('');
     setNewPassword('');
     setConfirmPassword('');
     setStep(1);
+    setSecurityQuestions({ question1: '', question2: '' });
   };
 
   const handleClose = () => {
@@ -145,31 +167,33 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
         <DialogContent>
           <DialogHeader>
             <div className="mx-auto bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
-              <Mail className="w-6 h-6 text-primary" />
+              {step === 1 && <Shield className="w-6 h-6 text-primary" />}
+              {step === 2 && <Shield className="w-6 h-6 text-primary" />}
+              {step === 3 && <Lock className="w-6 h-6 text-primary" />}
             </div>
             <DialogTitle>
               {step === 1 && 'Reset Password'}
-              {step === 2 && 'Verify Reset Code'}
+              {step === 2 && 'Security Questions'}
               {step === 3 && 'Set New Password'}
             </DialogTitle>
             <DialogDescription>
               {step === 1 &&
-                "Enter your college email address and we'll send you instructions to reset your password."}
-              {step === 2 && 'Enter the reset code you received in your email.'}
+                "Enter your college email address to proceed with password reset."}
+              {step === 2 && 'Answer your security questions to verify your identity.'}
               {step === 3 && 'Enter your new password to complete reset.'}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Step 1: Request Code */}
+          {/* Step 1: Enter Email */}
           {step === 1 && (
-            <form onSubmit={handleRequestCode}>
+            <form onSubmit={handleGetSecurityQuestions}>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="reset-email">College Email</Label>
                   <Input
                     id="reset-email"
                     type="email"
-                    placeholder="yourname@nandhaengg.org"
+                    placeholder="regno@nandhaengg.org"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -182,27 +206,44 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={loading}>
-                  {loading ? 'Sending...' : 'Send Reset Code'}
+                  {loading ? 'Checking...' : 'Continue'}
                 </Button>
               </DialogFooter>
             </form>
           )}
 
-          {/* Step 2: Verify Code */}
+          {/* Step 2: Security Questions */}
           {step === 2 && (
-            <form onSubmit={handleVerifyCode}>
+            <form onSubmit={handleVerifySecurityAnswers}>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="reset-code">Reset Code</Label>
-                  <Input
-                    id="reset-code"
-                    type="text"
-                    placeholder="Enter the 6-digit code"
-                    value={resetCode}
-                    onChange={(e) => setResetCode(e.target.value)}
-                    required
-                    className="bg-input-background"
-                  />
+                <div className="space-y-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800 font-medium mb-2">
+                      {securityQuestions.question1}
+                    </p>
+                    <Input
+                      type="text"
+                      placeholder="Your answer"
+                      value={securityAnswer1}
+                      onChange={(e) => setSecurityAnswer1(e.target.value)}
+                      required
+                      className="bg-input-background"
+                    />
+                  </div>
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800 font-medium mb-2">
+                      {securityQuestions.question2}
+                    </p>
+                    <Input
+                      type="text"
+                      placeholder="Your answer"
+                      value={securityAnswer2}
+                      onChange={(e) => setSecurityAnswer2(e.target.value)}
+                      required
+                      className="bg-input-background"
+                    />
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -210,7 +251,7 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={loading}>
-                  {loading ? 'Verifying...' : 'Verify Code'}
+                  {loading ? 'Verifying...' : 'Verify Answers'}
                 </Button>
               </DialogFooter>
             </form>

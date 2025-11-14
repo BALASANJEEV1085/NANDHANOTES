@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PasswordInput } from './ui/password-input';
+import logo from '../assests/logonandhanotes.png';
 import {
   Card,
   CardContent,
@@ -11,21 +12,21 @@ import {
   CardHeader,
   CardTitle,
 } from './ui/card';
-import { BookOpen, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 
 interface LoginPageProps {
   onLogin: (userData: any) => void;
   onNavigateToSignup: () => void;
   onForgotPassword: () => void;
-  onNavigateToLanding: () => void; // Add this prop
+  onNavigateToLanding: () => void;
 }
 
 export function LoginPage({
   onLogin,
   onNavigateToSignup,
   onForgotPassword,
-  onNavigateToLanding, // Add this prop
+  onNavigateToLanding,
 }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -81,12 +82,16 @@ export function LoginPage({
         Back to Home
       </Button>
 
-      <Card className="w-full max-w-md shadow-xl bg-white border border-gray-200">
+      <Card className="w-full max-w-md shadow-xl bg-card border border-border">
         <CardHeader className="space-y-3 text-center">
           <div className="mx-auto bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center">
-            <BookOpen className="w-8 h-8 text-primary" />
+            <img 
+              src={logo}
+              alt="Nandha Notes Logo"
+              className="w-full h-full object-cover"
+            />
           </div>
-          <CardTitle className="text-3xl">Welcome to Nandha Notes</CardTitle>
+          <CardTitle className="text-3xl text-card-foreground">Welcome to Nandha Notes</CardTitle>
           <CardDescription>
             Sign in with your college email to access shared notes
           </CardDescription>
@@ -95,24 +100,26 @@ export function LoginPage({
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">College Email</Label>
+              <Label htmlFor="email" className="text-foreground">College Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="yourname@nandhaengg.org"
+                placeholder="regno@nandhaengg.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-background text-foreground border-border"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-foreground">Password</Label>
               <PasswordInput
                 id="password"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="bg-background text-foreground border-border"
               />
             </div>
             <button

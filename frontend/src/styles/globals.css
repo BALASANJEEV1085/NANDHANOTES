@@ -382,5 +382,26 @@ input:checked + .slider:before {
   }
 }
 
+/* Force dropdown options text to be visible */
+select {
+  color: black !important;
+  background-color: white !important;
+}
+
+select option {
+  color: black !important;
+  background-color: white !important;
+}
+
+/* Dark mode fix */
+.dark select {
+  color: white !important;
+  background-color: #1a1f2c !important;
+}
+
+.dark select option {
+  color: white !important;
+  background-color: #1a1f2c !important;
+}
 
 
