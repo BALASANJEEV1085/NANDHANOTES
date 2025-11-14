@@ -2,10 +2,6 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import bodyParser from "body-parser";
-<<<<<<< HEAD
-=======
-import sgMail from '@sendgrid/mail';
->>>>>>> 33a80ecfafa0b02de06e6bce28d2aa481fbae77e
 import multer from "multer";
 import { Octokit } from '@octokit/rest';
 import dotenv from 'dotenv';
@@ -15,9 +11,6 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
-
-// ✅ Initialize SendGrid
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // ✅ Connect MongoDB Atlas
 mongoose.connect(
@@ -98,7 +91,6 @@ const channelSchema = new mongoose.Schema({
 
 const Channel = mongoose.model("Channel", channelSchema);
 
-<<<<<<< HEAD
 // ✅ Route: Check if email exists
 app.post("/check-email", async (req, res) => {
   const { email } = req.body;
@@ -111,26 +103,6 @@ app.post("/check-email", async (req, res) => {
     res.status(500).json({ message: "Error checking email" });
   }
 });
-=======
-// ✅ Email sending function
-const sendEmail = async (to, subject, html) => {
-  try {
-    const msg = {
-      to,
-      from: 'nandhanotes.official@gmail.com', // This can be any email
-      subject,
-      html,
-    };
-
-    await sgMail.send(msg);
-    console.log(`✅ Email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ SendGrid error:', error.response?.body || error.message);
-    return false;
-  }
-};
->>>>>>> 33a80ecfafa0b02de06e6bce28d2aa481fbae77e
 
 // ✅ Route: Signup
 app.post("/signup", async (req, res) => {
@@ -152,7 +124,6 @@ app.post("/signup", async (req, res) => {
     });
     await newUser.save();
 
-<<<<<<< HEAD
     res.json({ 
       message: "Account created successfully! Remember your security answers for password recovery.",
       user: {
@@ -164,70 +135,6 @@ app.post("/signup", async (req, res) => {
   } catch (err) {
     console.error("❌ Signup error:", err);
     res.status(500).json({ message: "Failed to create account" });
-=======
-    const emailSent = await sendEmail(
-      email,
-      "📚 Verify your Nandha Notes Account",
-      `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
-        <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-          <div style="background-color: #16a34a; padding: 20px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">📚 Nandha Notes</h1>
-          </div>
-          <div style="padding: 30px; text-align: center;">
-            <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Verify Your Email Address</h2>
-            <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-              Hello ${username} 👋, thank you for signing up for <strong>Nandha Notes</strong>.<br>
-              To complete your registration, please use the verification code below:
-            </p>
-            <div style="display: inline-block; padding: 15px 30px; background-color: #16a34a; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
-              ${verificationCode}
-            </div>
-            <p style="color: #777777; font-size: 14px; margin-top: 20px;">
-              This code will expire in 10 minutes. Please do not share it with anyone.
-            </p>
-          </div>
-          <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
-            <p style="margin: 0;">
-              © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
-            </p>
-          </div>
-        </div>
-      </div>
-      `
-    );
-
-    if (!emailSent) {
-      return res.status(500).json({ message: "Failed to send verification email" });
-    }
-
-    res.json({ message: "Verification code sent successfully" });
-  } catch (err) {
-    console.error("❌ Signup error:", err);
-    res.status(500).json({ message: "Failed to create account" });
-  }
-});
-
-// ✅ Route: Verify Signup
-app.post("/verify", async (req, res) => {
-  const { email, code } = req.body;
-
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (user.verificationCode === code) {
-      user.verified = true;
-      user.verificationCode = null;
-      await user.save();
-      res.json({ message: "Account verified successfully" });
-    } else {
-      res.status(400).json({ message: "Invalid verification code" });
-    }
-  } catch (err) {
-    console.error("❌ Verification error:", err);
-    res.status(500).json({ message: "Verification failed" });
->>>>>>> 33a80ecfafa0b02de06e6bce28d2aa481fbae77e
   }
 });
 
@@ -292,7 +199,6 @@ app.post("/get-security-questions", async (req, res) => {
       return res.status(404).json({ message: "No account found with that email." });
     }
 
-<<<<<<< HEAD
     res.json({
       securityQuestion1: user.securityQuestion1,
       securityQuestion2: user.securityQuestion2
@@ -300,53 +206,6 @@ app.post("/get-security-questions", async (req, res) => {
   } catch (err) {
     console.error("❌ Get security questions error:", err);
     res.status(500).json({ message: "Failed to get security questions" });
-=======
-    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    user.resetCode = resetCode;
-    await user.save();
-
-    const emailSent = await sendEmail(
-      email,
-      "🔐 Password Reset Code - Nandha Notes",
-      `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; padding: 40px;">
-        <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-          <div style="background-color: #dc2626; padding: 20px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">🔐 Nandha Notes</h1>
-          </div>
-          <div style="padding: 30px; text-align: center;">
-            <h2 style="color: #333333; font-size: 20px; margin-bottom: 15px;">Password Reset Request</h2>
-            <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-              We received a request to reset your password for your <strong>Nandha Notes</strong> account.
-              Use the code below to reset your password:
-            </p>
-            <div style="display: inline-block; padding: 15px 30px; background-color: #dc2626; color: #ffffff; font-size: 28px; font-weight: bold; letter-spacing: 3px; border-radius: 8px; margin-bottom: 25px;">
-              ${resetCode}
-            </div>
-            <p style="color: #777777; font-size: 14px; margin-top: 20px;">
-              This code will expire in 10 minutes.<br>
-              If you didn't request this, you can safely ignore this email.
-            </p>
-          </div>
-          <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 13px; color: #888888;">
-            <p style="margin: 0;">
-              © ${new Date().getFullYear()} Nandha Notes. All rights reserved.<br>
-            </p>
-          </div>
-        </div>
-      </div>
-      `
-    );
-
-    if (!emailSent) {
-      return res.status(500).json({ message: "Failed to send reset code" });
-    }
-
-    res.json({ message: "Reset code sent to your email." });
-  } catch (err) {
-    console.error("❌ Reset request error:", err);
-    res.status(500).json({ message: "Failed to process reset request" });
->>>>>>> 33a80ecfafa0b02de06e6bce28d2aa481fbae77e
   }
 });
 
@@ -356,7 +215,6 @@ app.post("/verify-security-answers", async (req, res) => {
 
   try {
     const user = await User.findOne({ email });
-<<<<<<< HEAD
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -372,18 +230,6 @@ app.post("/verify-security-answers", async (req, res) => {
   } catch (err) {
     console.error("❌ Security answers verification error:", err);
     res.status(500).json({ message: "Security answers verification failed" });
-=======
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (user.resetCode === code) {
-      res.json({ message: "Code verified successfully" });
-    } else {
-      res.status(400).json({ message: "Invalid reset code" });
-    }
-  } catch (err) {
-    console.error("❌ Reset verification error:", err);
-    res.status(500).json({ message: "Reset verification failed" });
->>>>>>> 33a80ecfafa0b02de06e6bce28d2aa481fbae77e
   }
 });
 
@@ -784,35 +630,4 @@ app.get("/test-github", async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
-=======
-// ✅ Test Email Route
-app.get("/test-email", async (req, res) => {
-  try {
-    const emailSent = await sendEmail(
-      "balasnjeev1085@gmail.com",
-      "✅ SendGrid Test - Nandha Notes",
-      `
-      <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #16a34a;">✅ SendGrid Email Test Successful!</h2>
-        <p>Your Nandha Notes email system is working perfectly with SendGrid.</p>
-        <p>Time: ${new Date().toString()}</p>
-        <p>You can now send verification and reset emails to your users!</p>
-      </div>
-      `
-    );
-
-    if (emailSent) {
-      res.json({ message: "Test email sent successfully!" });
-    } else {
-      res.status(500).json({ message: "Failed to send test email" });
-    }
-  } catch (error) {
-    console.error("❌ Test email failed:", error);
-    res.status(500).json({ message: "Test email failed", error: error.message });
-  }
-});
-
-app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
->>>>>>> 33a80ecfafa0b02de06e6bce28d2aa481fbae77e
