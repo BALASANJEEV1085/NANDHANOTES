@@ -11,23 +11,22 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { PasswordInput } from './ui/password-input';
 import { Button } from './ui/button';
-import { Shield, Lock } from 'lucide-react';
+import { Shield, Lock, Key } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 
 interface ResetPasswordModalProps {
   open: boolean;
   onClose: () => void;
+  onReset: (email: string) => void;
 }
 
-export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
+export function ResetPasswordModal({ open, onClose, onReset }: ResetPasswordModalProps) {
   const [email, setEmail] = useState('');
-  const [securityAnswer1, setSecurityAnswer1] = useState('');
-  const [securityAnswer2, setSecurityAnswer2] = useState('');
+  const [securityPass, setSecurityPass] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [step, setStep] = useState(1); // 1 = enter email, 2 = security questions, 3 = new password
+  const [step, setStep] = useState(1); // 1 = enter email, 2 = security password, 3 = new password
   const [loading, setLoading] = useState(false);
-  const [securityQuestions, setSecurityQuestions] = useState({ question1: '', question2: '' });
 
   // Password requirements
   const passwordRequirements = {
@@ -45,7 +44,7 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
     passwordRequirements.hasNumber &&
     passwordRequirements.hasSpecialChar;
 
-  const handleGetSecurityQuestions = async (e: React.FormEvent) => {
+  const handleVerifyEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.endsWith('@nandhaengg.org')) {
       toast.error('Please use your domain mail');
@@ -54,20 +53,18 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
 
     try {
       setLoading(true);
-      const res = await fetch('https://nandhanotes.onrender.com/get-security-questions', {
+      const res = await fetch('https://nandhanotes.onrender.com/check-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
+      
       const data = await res.json();
-      if (res.ok) {
-        setSecurityQuestions({
-          question1: data.securityQuestion1,
-          question2: data.securityQuestion2
-        });
+      
+      if (res.ok && data.exists) {
         setStep(2);
       } else {
-        toast.error(data.message);
+        toast.error('No account found with this email');
       }
     } catch (err) {
       toast.error('Error connecting to server.');
@@ -76,33 +73,32 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
     }
   };
 
-  const handleVerifySecurityAnswers = async (e: React.FormEvent) => {
+  const handleVerifySecurityPass = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!securityAnswer1 || !securityAnswer2) {
-      toast.error('Please answer both security questions');
+    if (!securityPass) {
+      toast.error('Please enter your security password');
       return;
     }
 
     try {
       setLoading(true);
-      const res = await fetch('https://nandhanotes.onrender.com/verify-security-answers', {
+      const res = await fetch('https://nandhanotes.onrender.com/verify-security-pass', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           email, 
-          securityAnswer1, 
-          securityAnswer2 
+          securityPass 
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Security answers verified successfully!');
+        toast.success('Security password verified successfully!');
         setStep(3);
       } else {
-        toast.error(data.message);
+        toast.error(data.message || 'Invalid security password');
       }
     } catch (err) {
-      toast.error('Error verifying security answers.');
+      toast.error('Error verifying security password.');
     } finally {
       setLoading(false);
     }
@@ -134,6 +130,7 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
         setTimeout(() => {
           resetForm();
           onClose();
+          onReset(email);
         }, 1000);
       } else {
         toast.error(data.message);
@@ -147,12 +144,10 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
 
   const resetForm = () => {
     setEmail('');
-    setSecurityAnswer1('');
-    setSecurityAnswer2('');
+    setSecurityPass('');
     setNewPassword('');
     setConfirmPassword('');
     setStep(1);
-    setSecurityQuestions({ question1: '', question2: '' });
   };
 
   const handleClose = () => {
@@ -168,25 +163,25 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
           <DialogHeader>
             <div className="mx-auto bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
               {step === 1 && <Shield className="w-6 h-6 text-primary" />}
-              {step === 2 && <Shield className="w-6 h-6 text-primary" />}
+              {step === 2 && <Key className="w-6 h-6 text-primary" />}
               {step === 3 && <Lock className="w-6 h-6 text-primary" />}
             </div>
             <DialogTitle>
               {step === 1 && 'Reset Password'}
-              {step === 2 && 'Security Questions'}
+              {step === 2 && 'Verify Security Password'}
               {step === 3 && 'Set New Password'}
             </DialogTitle>
             <DialogDescription>
               {step === 1 &&
                 "Enter your college email address to proceed with password reset."}
-              {step === 2 && 'Answer your security questions to verify your identity.'}
+              {step === 2 && 'Enter your security password to verify your identity.'}
               {step === 3 && 'Enter your new password to complete reset.'}
             </DialogDescription>
           </DialogHeader>
 
           {/* Step 1: Enter Email */}
           {step === 1 && (
-            <form onSubmit={handleGetSecurityQuestions}>
+            <form onSubmit={handleVerifyEmail}>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="reset-email">College Email</Label>
@@ -212,46 +207,32 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
             </form>
           )}
 
-          {/* Step 2: Security Questions */}
+          {/* Step 2: Security Password */}
           {step === 2 && (
-            <form onSubmit={handleVerifySecurityAnswers}>
+            <form onSubmit={handleVerifySecurityPass}>
               <div className="space-y-4 py-4">
                 <div className="space-y-3">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <p className="text-sm text-blue-800 font-medium mb-2">
-                      {securityQuestions.question1}
+                      Enter the security password that was generated during your signup.
                     </p>
                     <Input
                       type="text"
-                      placeholder="Your answer"
-                      value={securityAnswer1}
-                      onChange={(e) => setSecurityAnswer1(e.target.value)}
+                      placeholder="Enter your security password"
+                      value={securityPass}
+                      onChange={(e) => setSecurityPass(e.target.value)}
                       required
-                      className="bg-input-background"
-                    />
-                  </div>
-                  
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800 font-medium mb-2">
-                      {securityQuestions.question2}
-                    </p>
-                    <Input
-                      type="text"
-                      placeholder="Your answer"
-                      value={securityAnswer2}
-                      onChange={(e) => setSecurityAnswer2(e.target.value)}
-                      required
-                      className="bg-input-background"
+                      className="bg-input-background font-mono"
                     />
                   </div>
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleClose}>
-                  Cancel
+                <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                  Back
                 </Button>
                 <Button type="submit" disabled={loading}>
-                  {loading ? 'Verifying...' : 'Verify Answers'}
+                  {loading ? 'Verifying...' : 'Verify Security Password'}
                 </Button>
               </DialogFooter>
             </form>
@@ -310,8 +291,8 @@ export function ResetPasswordModal({ open, onClose }: ResetPasswordModalProps) {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleClose}>
-                  Cancel
+                <Button type="button" variant="outline" onClick={() => setStep(2)}>
+                  Back
                 </Button>
                 <Button type="submit" disabled={loading || !isPasswordValid}>
                   {loading ? 'Updating...' : 'Update Password'}

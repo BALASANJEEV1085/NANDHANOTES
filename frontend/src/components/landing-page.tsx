@@ -1,6 +1,7 @@
 // landing-page.tsx
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import logo from '../assests/logonandhanotes.png';
 import { 
   BookOpen, 
   Users, 
@@ -139,62 +140,62 @@ export function LandingPage({
     <div className="landing-page">
       {/* Header */}
       <header className="landing-header">
-        <div className="header-container">
-          <div className="logo">
-            <BookOpen className="logo-icon" />
-            <span className="logo-text">
-              Nandha <span className="logo-highlight">Notes</span>
-            </span>
-          </div>
-          
-          <nav className="nav-links">
-            <a 
-              href="#home" 
-              className={`nav-link ${activeSection === 'home' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); smoothScroll('home'); }}
-            >
-              Home
-            </a>
-            <a 
-              href="#features" 
-              className={`nav-link ${activeSection === 'features' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); smoothScroll('features'); }}
-            >
-              Features
-            </a>
-            <a 
-              href="#how-it-works" 
-              className={`nav-link ${activeSection === 'how-it-works' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); smoothScroll('how-it-works'); }}
-            >
-              How It Works
-            </a>
-            <a 
-              href="#supported-files" 
-              className={`nav-link ${activeSection === 'supported-files' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); smoothScroll('supported-files'); }}
-            >
-              Files
-            </a>
-            <a 
-              href="#faq" 
-              className={`nav-link ${activeSection === 'faq' ? 'active' : ''}`}
-              onClick={(e) => { e.preventDefault(); smoothScroll('faq'); }}
-            >
-              FAQ
-            </a>
-          </nav>
+  <div className="header-container">
+    <div className="logo">
+      <img src={logo} alt="Nandha Notes" className="logo-image" />
+      <span className="logo-text">
+        Nandha <span className="logo-highlight">Notes</span>
+      </span>
+    </div>
+    
+    <nav className="nav-links">
+      <a 
+        href="#home" 
+        className={`nav-link ${activeSection === 'home' ? 'active' : ''}`}
+        onClick={(e) => { e.preventDefault(); smoothScroll('home'); }}
+      >
+        Home
+      </a>
+      <a 
+        href="#features" 
+        className={`nav-link ${activeSection === 'features' ? 'active' : ''}`}
+        onClick={(e) => { e.preventDefault(); smoothScroll('features'); }}
+      >
+        Features
+      </a>
+      <a 
+        href="#how-it-works" 
+        className={`nav-link ${activeSection === 'how-it-works' ? 'active' : ''}`}
+        onClick={(e) => { e.preventDefault(); smoothScroll('how-it-works'); }}
+      >
+        How It Works
+      </a>
+      <a 
+        href="#supported-files" 
+        className={`nav-link ${activeSection === 'supported-files' ? 'active' : ''}`}
+        onClick={(e) => { e.preventDefault(); smoothScroll('supported-files'); }}
+      >
+        Files
+      </a>
+      <a 
+        href="#faq" 
+        className={`nav-link ${activeSection === 'faq' ? 'active' : ''}`}
+        onClick={(e) => { e.preventDefault(); smoothScroll('faq'); }}
+      >
+        FAQ
+      </a>
+    </nav>
 
-          <div className="header-buttons">
-            <Button 
-              className="signup-btn"
-              onClick={onNavigateToSignup}
-            >
-              Get Started
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="header-buttons">
+      <Button 
+        className="signup-btn"
+        onClick={onNavigateToSignup}
+      >
+        Get Started
+      </Button>
+    </div>
+  </div>
+</header>
 
       {/* Hero Section */}
       <section className="section home-section" id="home">
@@ -472,21 +473,32 @@ export function LandingPage({
 
       {/* Footer */}
       <footer className="landing-footer">
-        <div className="footer-content">
-          <div className="footer-logo">
-            <BookOpen className="footer-logo-icon" />
-            <span className="footer-logo-text">
-              Nandha <span className="footer-logo-highlight">Notes</span>
-            </span>
-          </div>
-          <div className="footer-copyright">
-            <p>© 2025 Nandha Notes. All rights reserved.</p>
-            <p className="footer-made-with">Made with ❤ for students by students</p>
-          </div>
-        </div>
-      </footer>
+  <div className="footer-content">
+    <div className="footer-logo">
+      <img src={logo} alt="Nandha Notes" className="footer-logo-image" />
+      <span className="footer-logo-text">
+        Nandha <span className="footer-logo-highlight">Notes</span>
+      </span>
+    </div>
+    <div className="footer-copyright">
+      <p>© 2025 Nandha Notes. All rights reserved.</p>
+      <p className="footer-made-with">Made with ❤ for students by students</p>
+    </div>
+  </div>
+</footer>
 
       <style jsx>{`
+      .footer-logo-image {
+  height: 35px; /* Slightly smaller than header logo */
+  width: auto;
+  object-fit: contain;
+}
+
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
         .landing-page {
           min-height: 100vh;
           background: var(--background);
@@ -1674,6 +1686,17 @@ export function LandingPage({
             font-size: 1.75rem;
           }
         }
+          .logo-image {
+  height: 40px; /* Adjust based on your logo's aspect ratio */
+  width: auto;
+  object-fit: contain;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
       `}</style>
     </div>
   );

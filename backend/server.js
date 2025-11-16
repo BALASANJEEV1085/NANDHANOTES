@@ -44,10 +44,7 @@ const userSchema = new mongoose.Schema({
   username: String,
   email: String,
   password: String,
-  securityQuestion1: String,
-  securityAnswer1: String,
-  securityQuestion2: String,
-  securityAnswer2: String,
+  securityPass: String, // New field for security password
   verified: { type: Boolean, default: true }, // Auto-verify since no email verification
   credits: { type: Number, default: 0 },
   uploadCount: { type: Number, default: 0 },
@@ -106,7 +103,7 @@ app.post("/check-email", async (req, res) => {
 
 // ✅ Route: Signup
 app.post("/signup", async (req, res) => {
-  const { username, email, password, securityQuestion1, securityAnswer1, securityQuestion2, securityAnswer2 } = req.body;
+  const { username, email, password, securityPass } = req.body;
 
   try {
     const existing = await User.findOne({ email });
@@ -116,16 +113,13 @@ app.post("/signup", async (req, res) => {
       username, 
       email, 
       password, 
-      securityQuestion1,
-      securityAnswer1: securityAnswer1.toLowerCase().trim(),
-      securityQuestion2,
-      securityAnswer2: securityAnswer2.toLowerCase().trim(),
+      securityPass,
       verified: true // Auto-verify since no email verification
     });
     await newUser.save();
 
     res.json({ 
-      message: "Account created successfully! Remember your security answers for password recovery.",
+      message: "Account created successfully! Remember your security password for account recovery.",
       user: {
         id: newUser._id,
         username: newUser.username,
@@ -135,6 +129,27 @@ app.post("/signup", async (req, res) => {
   } catch (err) {
     console.error("❌ Signup error:", err);
     res.status(500).json({ message: "Failed to create account" });
+  }
+});
+
+// ✅ Route: Verify Security Password
+app.post("/verify-security-pass", async (req, res) => {
+  const { email, securityPass } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.securityPass === securityPass) {
+      res.json({ message: "Security password verified successfully" });
+    } else {
+      res.status(400).json({ message: "Invalid security password" });
+    }
+  } catch (err) {
+    console.error("❌ Security password verification error:", err);
+    res.status(500).json({ message: "Security password verification failed" });
   }
 });
 
@@ -186,50 +201,6 @@ app.get("/user/:email", async (req, res) => {
   } catch (err) {
     console.error("❌ Get user error:", err);
     res.status(500).json({ message: "Error fetching user data" });
-  }
-});
-
-// ✅ Route: Get Security Questions
-app.post("/get-security-questions", async (req, res) => {
-  const { email } = req.body;
-
-  try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "No account found with that email." });
-    }
-
-    res.json({
-      securityQuestion1: user.securityQuestion1,
-      securityQuestion2: user.securityQuestion2
-    });
-  } catch (err) {
-    console.error("❌ Get security questions error:", err);
-    res.status(500).json({ message: "Failed to get security questions" });
-  }
-});
-
-// ✅ Route: Verify Security Answers
-app.post("/verify-security-answers", async (req, res) => {
-  const { email, securityAnswer1, securityAnswer2 } = req.body;
-
-  try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const answer1Match = user.securityAnswer1 === securityAnswer1.toLowerCase().trim();
-    const answer2Match = user.securityAnswer2 === securityAnswer2.toLowerCase().trim();
-
-    if (answer1Match && answer2Match) {
-      res.json({ message: "Security answers verified successfully" });
-    } else {
-      res.status(400).json({ message: "Incorrect security answers" });
-    }
-  } catch (err) {
-    console.error("❌ Security answers verification error:", err);
-    res.status(500).json({ message: "Security answers verification failed" });
   }
 });
 
