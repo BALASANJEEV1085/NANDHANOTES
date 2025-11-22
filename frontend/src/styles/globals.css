@@ -404,4 +404,38 @@ select option {
   background-color: #1a1f2c !important;
 }
 
+/* Hide Google Docs viewer UI ONLY on mobile */
+@media (max-width: 768px) {
+
+  /* Hide toolbar, zoom controls, page numbers */
+  .google-docs-overlay {
+    position: absolute;
+    top: 0;
+    height: 50px; /* hides toolbar area */
+    width: 100%;
+    background: transparent;
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  /* Hide bottom bar (thumbnails / zoom / pages) */
+  .google-docs-bottom-hide {
+    position: absolute;
+    bottom: 0;
+    height: 60px;
+    width: 100%;
+    background: transparent;
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  iframe {
+    scrollbar-width: none;
+  }
+
+  iframe::-webkit-scrollbar {
+    display: none !important;
+  }
+}
+
 

@@ -330,7 +330,7 @@ Generated on: ${new Date().toLocaleString()}`;
               <Input
                 id="email"
                 type="email"
-                placeholder="23CS077@nandhaengg.org"
+                placeholder="regno@nandhaengg.org"
                 value={email}
                 onChange={handleEmailChange}
                 required
@@ -339,9 +339,7 @@ Generated on: ${new Date().toLocaleString()}`;
                   email && !isValidEmail(email) ? 'border-red-500' : ''
                 }`}
               />
-              <div className="text-xs text-muted-foreground">
-                Format: 7-character registration number + @nandhaengg.org
-              </div>
+              
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-foreground">Password</Label>

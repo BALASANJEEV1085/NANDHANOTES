@@ -143,7 +143,7 @@ export function LandingPage({
   <div className="header-container">
     <div className="logo">
       <img src={logo} alt="Nandha Notes" className="logo-image" />
-      <span className="logo-text">
+      <span className="logo-text cursor-pointer">
         Nandha <span className="logo-highlight">Notes</span>
       </span>
     </div>
@@ -188,7 +188,7 @@ export function LandingPage({
 
     <div className="header-buttons">
       <Button 
-        className="signup-btn"
+        className="signup-btn cursor-pointer"
         onClick={onNavigateToSignup}
       >
         Get Started
@@ -453,7 +453,7 @@ export function LandingPage({
             <div className="cta-buttons">
               <Button 
                 size="lg" 
-                className="cta-primary"
+                className="cta-primary cursor-pointer"
                 onClick={onNavigateToSignup}
               >
                 Create Your Account
@@ -461,7 +461,7 @@ export function LandingPage({
               <Button 
                 size="lg" 
                 variant="outline"
-                className="cta-secondary"
+                className="cta-secondary cursor-pointer"
                 onClick={onNavigateToLogin}
               >
                 Sign In

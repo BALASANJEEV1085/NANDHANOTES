@@ -256,7 +256,7 @@ export default function App() {
         await fetchNotes();
         await fetchUserChannels(); // Refresh channels to update note counts
         
-        toast.success(`Notes uploaded successfully! You earned ${data.creditsEarned} credits`);
+        // REMOVED: Success toast is now handled in UploadNotesModal only
         setShowUploadNotes(false);
         
         // 👇 Trigger dashboard refresh
@@ -727,7 +727,7 @@ export default function App() {
         onClose={() => setSelectedNote(null)}
         onDownloadNote={handleDownloadNote}
       />
-      <Toaster />
+      
     </>
   );
 }
