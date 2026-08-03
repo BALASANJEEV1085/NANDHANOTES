@@ -14,7 +14,7 @@ app.use(bodyParser.json());
 
 // ✅ Connect MongoDB Atlas
 mongoose.connect(
-  process.env.MONGODB_URI || "mongodb+srv://balasanjeev:balasanjeev@cluster0.vvgdhov.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
+  process.env.MONGODB_URI,
   { useNewUrlParser: true, useUnifiedTopology: true }
 )
 .then(() => console.log("✅ MongoDB Connected"))
