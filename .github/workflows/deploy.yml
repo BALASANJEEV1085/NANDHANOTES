@@ -81,7 +81,7 @@ jobs:
               "docker stop app 2>/dev/null || true",
               "docker rm app 2>/dev/null || true",
               "aws secretsmanager get-secret-value --region " + region + " --secret-id " + secret_id + " --query SecretString --output text | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(k+chr(61)+v) for k,v in d.items()]' > /home/ubuntu/app.env 2>/dev/null || touch /home/ubuntu/app.env",
-              "docker run -d --restart always -p 80:80 --env-file /home/ubuntu/app.env --name app " + image,
+              "docker run -d --restart always -p 80:5000 --env-file /home/ubuntu/app.env --name app " + image,
           ]
           cli = json.dumps(dict(DocumentName="AWS-RunShellScript", InstanceIds=[instance_id], Parameters=dict(commands=commands)))
           rc, cmd_id, err = aws("ssm", "send-command", "--region", region, "--cli-input-json", cli, "--query", "Command.CommandId", "--output", "text")
