@@ -8,7 +8,7 @@
         env:
           AWS_REGION: ap-south-1
           ECR_REPOSITORY: nandhanotes
-          INSTANCE_ID: i-0c2539fa0dc744e8a
+          INSTANCE_ID: "i-0c2539fa0dc744e8a"
 
         jobs:
           deploy:
@@ -102,7 +102,6 @@
                   echo "full_image=$FULL_IMAGE" >> $GITHUB_OUTPUT
 
               - name: Deploy to EC2 via SSM
-                if: ${{ env.INSTANCE_ID != '' }}
                 run: |
                   set -e
                   echo "==> Deploying container to EC2 instance: $INSTANCE_ID"
