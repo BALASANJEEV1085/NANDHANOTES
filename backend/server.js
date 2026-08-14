@@ -1,3 +1,5 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -601,4 +603,21 @@ app.get("/test-github", async (req, res) => {
   }
 });
 
-app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.get("/health", (req, res) => res.json({ status: "healthy" }));
+app.use(express.static(path.join(__dirname, "public")));
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/user") || req.path.startsWith("/channel") || req.path.startsWith("/get-notes") || req.path.startsWith("/test-github") || req.path.startsWith("/upload-note") || req.path.startsWith("/api")) {
+    return next();
+  }
+  const indexPath = path.join(__dirname, "public", "index.html");
+  res.sendFile(indexPath, (err) => {
+    if (err) res.status(200).send("Backend is up and running!");
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log("🚀 Server running on http://localhost:5000"));
