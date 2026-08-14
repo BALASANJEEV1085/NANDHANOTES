@@ -7,7 +7,7 @@ FROM node:18-alpine
 WORKDIR /app
 COPY backend/ ./
 RUN rm -rf node_modules && npm install --production --legacy-peer-deps
-COPY --from=frontend-builder /app/frontend/dist ./public
+COPY --from=frontend-builder /app/frontend/build ./public
 EXPOSE 5000
 ENV PORT=5000
 CMD ["node", "server.js"]
