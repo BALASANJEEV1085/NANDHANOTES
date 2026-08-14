@@ -1,0 +1,122 @@
+        name: Build & Deploy to EC2 Docker
+
+        on:
+          push:
+            branches: [main, master]
+          workflow_dispatch:
+
+        env:
+          AWS_REGION: ap-south-1
+          ECR_REPOSITORY: nandhanotes
+          INSTANCE_ID: i-04d6f0f0bd1ac264f
+
+        jobs:
+          deploy:
+            name: Build, Push and Deploy
+            runs-on: ubuntu-latest
+
+            steps:
+              - name: Checkout repository
+                uses: actions/checkout@v4
+
+              - name: Configure AWS credentials
+                uses: aws-actions/configure-aws-credentials@v4
+                with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ap-south-1
+
+              - name: Login to Amazon ECR
+                id: login-ecr
+                uses: aws-actions/amazon-ecr-login@v2
+
+- name: Generate Dockerfile if missing
+  run: |
+    if [ -f Dockerfile ]; then
+      echo "==> Dockerfile exists."
+      exit 0
+    fi
+    echo "==> No Dockerfile - generating for node app..."
+    PKG=""
+    while IFS= read -r line; do PKG="$line"; break; done < <(find . -name package.json -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | sort)
+    GOMOD=""
+    while IFS= read -r line; do GOMOD="$line"; break; done < <(find . -name go.mod -not -path "*/.git/*" 2>/dev/null)
+    REQTXT=""
+    while IFS= read -r line; do REQTXT="$line"; break; done < <(find . -name requirements.txt -o -name pyproject.toml -not -path "*/.git/*" 2>/dev/null)
+    CARGO=""
+    while IFS= read -r line; do CARGO="$line"; break; done < <(find . -name Cargo.toml -not -path "*/.git/*" 2>/dev/null)
+    GRADLE_OR_POM=""
+    while IFS= read -r line; do GRADLE_OR_POM="$line"; break; done < <(find . -name pom.xml -o -name build.gradle -o -name build.gradle.kts -not -path "*/.git/*" 2>/dev/null)
+    PHP_COMPOSER=""
+    while IFS= read -r line; do PHP_COMPOSER="$line"; break; done < <(find . -name composer.json -not -path "*/.git/*" 2>/dev/null)
+    RUBY_GEM=""
+    while IFS= read -r line; do RUBY_GEM="$line"; break; done < <(find . -name Gemfile -not -path "*/.git/*" 2>/dev/null)
+    STATIC_HTML=""
+    while IFS= read -r line; do STATIC_HTML="$line"; break; done < <(find . -name index.html -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null)
+
+    if [ -n "$PKG" ]; then
+      PKGDIR=$(dirname "$PKG"); PKGDIR="${PKGDIR#./}"
+      PORT=5000
+      if grep -q '"express"\|"fastify"\|"koa"\|"hapi"' "$PKG" 2>/dev/null; then PORT=5000; fi
+      if grep -q '"next"\|"react-scripts"\|"vite"' "$PKG" 2>/dev/null; then PORT=3000; fi
+      if [ "$PKGDIR" = "." ] || [ "$PKGDIR" = "" ]; then
+        INSTALL="npm install --legacy-peer-deps"; START="npm start"
+      else
+        INSTALL="cd $PKGDIR && npm install --legacy-peer-deps"; START="cd $PKGDIR && npm start"
+      fi
+      printf 'FROM node:20-alpine\nWORKDIR /app\nCOPY . .\nRUN %s\nEXPOSE %s\nCMD ["sh","-c","%s"]\n' "$INSTALL" "$PORT" "$START" > Dockerfile
+    elif [ -n "$GOMOD" ]; then
+      GODIR=$(dirname "$GOMOD"); GODIR="${GODIR#./}"
+      printf 'FROM golang:1.22-alpine AS b\nRUN apk add --no-cache git\nWORKDIR /app\nCOPY . .\nRUN cd %s && go mod download && CGO_ENABLED=0 go build -o server ./...\nFROM alpine:3.19\nWORKDIR /app\nCOPY --from=b /app/%s/server ./server\nEXPOSE 8080\nCMD ["./server"]\n' "$GODIR" "$GODIR" > Dockerfile
+    elif [ -n "$REQTXT" ]; then
+      REQDIR=$(dirname "$REQTXT"); REQDIR="${REQDIR#./}"
+      if [ "$REQDIR" = "." ] || [ "$REQDIR" = "" ]; then RF="requirements.txt"; else RF="$REQDIR/requirements.txt"; fi
+      printf 'FROM python:3.11-slim\nWORKDIR /app\nCOPY . .\nRUN if [ -f %s ]; then pip install --no-cache-dir -r %s; fi\nEXPOSE 8000\nCMD ["python","main.py"]\n' "$RF" "$RF" > Dockerfile
+    elif [ -n "$CARGO" ]; then
+      printf 'FROM rust:1.77-alpine AS b\nRUN apk add --no-cache musl-dev\nWORKDIR /app\nCOPY . .\nRUN cargo build --release\nFROM alpine:3.19\nWORKDIR /app\nCOPY --from=b /app/target/release/* /app/app\nEXPOSE 8080\nCMD ["/app/app"]\n' > Dockerfile
+    elif [ -n "$GRADLE_OR_POM" ]; then
+      printf 'FROM maven:3.9-eclipse-temurin-21-alpine AS b\nWORKDIR /app\nCOPY . .\nRUN mvn clean package -DskipTests 2>/dev/null || gradle build -x test 2>/dev/null || true\nFROM eclipse-temurin:21-jre-alpine\nWORKDIR /app\nCOPY --from=b /app/target/*.jar /app/app.jar 2>/dev/null || true\nEXPOSE 8080\nCMD ["java","-jar","/app/app.jar"]\n' > Dockerfile
+    elif [ -n "$PHP_COMPOSER" ]; then
+      printf 'FROM php:8.3-apache\nCOPY . /var/www/html/\nEXPOSE 80\nCMD ["apache2-foreground"]\n' > Dockerfile
+    elif [ -n "$RUBY_GEM" ]; then
+      printf 'FROM ruby:3.3-alpine\nWORKDIR /app\nCOPY . .\nRUN bundle install 2>/dev/null || true\nEXPOSE 3000\nCMD ["bundle","exec","rackup","-o","0.0.0.0","-p","3000"]\n' > Dockerfile
+    elif [ -n "$STATIC_HTML" ]; then
+      HTMLDIR=$(dirname "$STATIC_HTML"); HTMLDIR="${HTMLDIR#./}"
+      printf 'FROM nginx:alpine\nCOPY %s /usr/share/nginx/html\nEXPOSE 80\nCMD ["nginx","-g","daemon off;"]\n' "$HTMLDIR" > Dockerfile
+    else
+      printf 'FROM node:20-alpine\nWORKDIR /app\nCOPY . .\nEXPOSE 5000\nCMD ["sh","-c","echo ready && sleep infinity"]\n' > Dockerfile
+    fi
+    echo "==> Generated Dockerfile:"; cat Dockerfile
+
+              - name: Build, tag, and push Docker image to ECR
+                id: build-image
+                env:
+                  ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+                run: |
+                  set -e
+                  FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+                  echo "Building $FULL_IMAGE:latest"
+                  docker build --tag "$FULL_IMAGE:$GITHUB_SHA" --tag "$FULL_IMAGE:latest" .
+                  docker push "$FULL_IMAGE:$GITHUB_SHA"
+                  docker push "$FULL_IMAGE:latest"
+                  echo "full_image=$FULL_IMAGE" >> $GITHUB_OUTPUT
+
+              - name: Deploy to EC2 via SSM
+                if: ${{ env.INSTANCE_ID != '' }}
+                run: |
+                  set -e
+                  echo "==> Deploying container to EC2 instance: $INSTANCE_ID"
+                  CMD_ID=$(aws ssm send-command                     --region ap-south-1                     --instance-ids "$INSTANCE_ID"                     --document-name "AWS-RunShellScript"                     --parameters 'commands=["systemctl start docker 2>/dev/null || service docker start 2>/dev/null || true", "until docker info > /dev/null 2>&1; do echo waiting for docker; sleep 3; done", "aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 696434672023.dkr.ecr.ap-south-1.amazonaws.com", "docker pull 696434672023.dkr.ecr.ap-south-1.amazonaws.com/nandhanotes:latest", "docker stop app 2>/dev/null || true", "docker rm   app 2>/dev/null || true", "aws secretsmanager get-secret-value --region ap-south-1 --secret-id deptic/NANDHANOTES/secrets --query SecretString --output text 2>/dev/null | tr ',' '\\n' | sed 's/[{}\"]]//g' | sed 's/: /=/g' | grep '=' > /home/ubuntu/app.env || touch /home/ubuntu/app.env", "docker run -d --restart always -p 80:5000 --env-file /home/ubuntu/app.env --name app 696434672023.dkr.ecr.ap-south-1.amazonaws.com/nandhanotes:latest", "sleep 5 && docker ps | grep app && curl -sf http://localhost:5000/ > /dev/null && echo HEALTH_OK || echo HEALTH_WARN"]'                     --query "Command.CommandId"                     --output text)
+                  echo "SSM Command ID: $CMD_ID"
+                  for i in $(seq 1 36); do
+                    sleep 5
+                    STATUS=$(aws ssm get-command-invocation                       --region ap-south-1                       --command-id "$CMD_ID"                       --instance-id "$INSTANCE_ID"                       --query "Status" --output text 2>/dev/null || echo "Pending")
+                    echo "Status [$i/36]: $STATUS"
+                    if [ "$STATUS" = "Success" ]; then echo "Deployment succeeded!"; exit 0; fi
+                    if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
+                      echo "==> Command failed with status: $STATUS"
+                      aws ssm get-command-invocation --region ap-south-1 --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query "StandardErrorContent" --output text || true
+                      exit 1
+                    fi
+                  done
+                  echo "Timeout waiting for SSM command"; exit 1
