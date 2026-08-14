@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REPOSITORY: 696434672023.dkr.ecr.ap-south-1.amazonaws.com/nandhanotes
+  ECR_REPOSITORY: nandhanotes
   ECS_CLUSTER: nandhanotes-cluster
   ECS_SERVICE: nandhanotes-service
 
@@ -32,8 +32,9 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA" >> $GITHUB_OUTPUT
 
       - name: Force new ECS deployment
