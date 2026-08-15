@@ -1,3 +1,4 @@
+--- .github/workflows/deploy.yml ---
 name: Build & Deploy to EC2 Docker
 
 on:
@@ -63,32 +64,11 @@ jobs:
 
           echo "==> Sending SSM deployment command to instance $INSTANCE_ID..."
           CMD_ID=$(aws ssm send-command                     --region "$AWS_REGION"                     --instance-ids "$INSTANCE_ID"                     --document-name "AWS-RunShellScript"                     --parameters "commands=[
-              "systemctl start docker || service docker start || true",
-              "until docker info > /dev/null 2>&1; do sleep 2; done",
-              "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY",
-              "docker pull $FULL_IMAGE",
-              "docker stop app || true",
-              "docker rm app || true",
-              "aws secretsmanager get-secret-value --region $AWS_REGION --secret-id deptic/NANDHANOTES/secrets --query SecretString --output text | python3 -c \"import sys,json; [print(k, v, sep=chr(61)) for k, v in json.load(sys.stdin).items()]\" > /home/ubuntu/app.env 2>/dev/null || touch /home/ubuntu/app.env",
-              "docker run -d --restart always -p 80:5000 --env-file /home/ubuntu/app.env --name app $FULL_IMAGE"
-            ]"                     --query "Command.CommandId"                     --output text)
-
-          echo "SSM CommandId: $CMD_ID"
-
-          echo "==> Polling command status..."
-          for i in $(seq 1 36); do
-            sleep 5
-            STATUS=$(aws ssm get-command-invocation                       --region "$AWS_REGION"                       --command-id "$CMD_ID"                       --instance-id "$INSTANCE_ID"                       --query "Status"                       --output text 2>/dev/null || true)
-            echo "Status [$i/36]: $STATUS"
-            if [ "$STATUS" = "Success" ]; then
-              echo "==> Deployment successfully finished!"
-              exit 0
-            fi
-            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
-              echo "==> SSM Command Failed!"
-              aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query "StandardErrorContent" --output text 2>/dev/null || true
-              exit 1
-            fi
-          done
-          echo "==> Timed out waiting for SSM command execution."
-          exit 1
+              'systemctl start docker || service docker start || true',
+              'until docker info > /dev/null 2>&1; do sleep 2; done',
+              'aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY',
+              'docker pull $FULL_IMAGE',
+              'docker run -d -p 5000:5000 $FULL_IMAGE'
+          ]"
+          )
+          echo "Command ID: $CMD_ID"
