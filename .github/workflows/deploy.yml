@@ -8,7 +8,7 @@ on:
 env:
   AWS_REGION: ap-south-1
   ECR_REPOSITORY: nandhanotes
-  INSTANCE_ID: i-070b8a2636ac6e403
+  INSTANCE_ID: i-test123
 
 jobs:
   deploy:
@@ -50,12 +50,12 @@ jobs:
         run: |
           set -e
           AWS_REGION="ap-south-1"
-          INSTANCE_ID="i-070b8a2636ac6e403"
-          ECR_REGISTRY="${ECR_REGISTRY:-696434672023.dkr.ecr.ap-south-1.amazonaws.com}"
+          INSTANCE_ID="i-test123"
+          ECR_REGISTRY="${ECR_REGISTRY:-nandhanotes.dkr.ecr.ap-south-1.amazonaws.com}"
           REPO="nandhanotes"
           SECRET_ID="deptic/NANDHANOTES/secrets"
           FULL_IMAGE="$ECR_REGISTRY/$REPO:latest"
-          TARGET_PORT="5000"
+          TARGET_PORT="3000"
 
           echo "==> Waiting for SSM agent on instance $INSTANCE_ID in $AWS_REGION..."
           PING="Offline"
@@ -90,7 +90,7 @@ jobs:
               "docker stop app 2>/dev/null || true",
               "docker rm app 2>/dev/null || true",
               "aws secretsmanager get-secret-value --region $AWS_REGION --secret-id $SECRET_ID --query SecretString --output text | python3 -c \"import sys,json; [print(k, v, sep=chr(61)) for k, v in json.load(sys.stdin).items()]\" > /home/ubuntu/app.env 2>/dev/null || touch /home/ubuntu/app.env",
-              "docker run -d --restart always -p 80:$TARGET_PORT --env-file /home/ubuntu/app.env --name app $FULL_IMAGE"
+              "docker run -d --restart always -p 80:$TARGET_PORT -e PORT=$TARGET_PORT -e HOSTNAME=0.0.0.0 --env-file /home/ubuntu/app.env --name app $FULL_IMAGE"
             ]
           }
           SSMPARAMS
