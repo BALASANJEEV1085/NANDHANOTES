@@ -18,7 +18,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node (for potential npm scripts)
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -27,11 +27,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Install AWS CLI
+      - name: Set up Python (for AWS CLI)
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Install awscli via pip
+
+      - name: Install AWS CLI
         run: |
           python -m pip install --upgrade pip
           pip install awscli
@@ -57,7 +58,7 @@ jobs:
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           IMAGE_URI="${ECR_REPO_URI}:${IMAGE_TAG}"
-          echo "Building image $IMAGE_URI"
+          echo "Building Docker image $IMAGE_URI"
           docker build -t "$IMAGE_URI" .
 
       - name: Push Docker image to ECR
@@ -66,7 +67,7 @@ jobs:
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
           IMAGE_URI="${ECR_REPO_URI}:${IMAGE_TAG}"
-          echo "Pushing image $IMAGE_URI"
+          echo "Pushing Docker image $IMAGE_URI"
           docker push "$IMAGE_URI"
 
       - name: Deploy to EC2 via SSM
@@ -96,7 +97,6 @@ jobs:
             --query "Command.CommandId" \
             --output text)
           echo "SSM command sent, ID: $COMMAND_ID"
-          # Wait for command to finish (simple poll)
           for i in {1..30}; do
             STATUS=$(aws ssm list-command-invocations \
               --command-id "$COMMAND_ID" \
@@ -107,26 +107,27 @@ jobs:
             echo "SSM command status: $STATUS"
             if [[ "$STATUS" == "Success" ]]; then
               break
-            elif [[ "$STATUS" == "Failed" || "$STATUS" == "Cancelled" || "$STATUS" == "TimedOut" ]]; then
-              echo "SSM command failed"
-              exit 1
             fi
             sleep 10
           done
+          if [[ "$STATUS" != "Success" ]]; then
+            echo "SSM command failed"
+            exit 1
+          fi
 
-      - name: Health check – ensure service returns HTTP 200
+      - name: Health check
         env:
           PUBLIC_URL: ${{ env.PUBLIC_URL }}
         run: |
-          echo "Waiting for the application to become healthy..."
+          echo "Waiting for application to become healthy..."
           for i in {1..30}; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_URL")
-            echo "Attempt $i – HTTP status: $HTTP_CODE"
-            if [[ "$HTTP_CODE" -eq 200 ]]; then
-              echo "✅ Application is healthy."
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_URL:5000")
+            echo "Attempt $i: HTTP $HTTP_CODE"
+            if [[ "$HTTP_CODE" == "200" ]]; then
+              echo "Health check passed."
               exit 0
             fi
             sleep 10
           done
-          echo "❌ Health check failed after multiple attempts."
+          echo "Health check failed."
           exit 1
