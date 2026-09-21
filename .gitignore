@@ -1,9 +1,32 @@
-echo "node_modules/
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Editor and OS files
 .vscode/
+.DS_Store
+
+# Python cache
 __pycache__/
 *.pyc
-.env.local
-.env.development
-.env.test
-" > .gitignore
+*.pyo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
 backend/.env
+frontend/.env
+
+# Build output
+frontend/dist/
+frontend/build/
+backend/dist/
+
+# Misc
+coverage/
