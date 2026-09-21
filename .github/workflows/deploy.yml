@@ -1,0 +1,132 @@
+name: Production Deploy – EC2 Docker
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      REGION: ap-south-1
+      ECR_REPO_URI: 759204735992.dkr.ecr.ap-south-1.amazonaws.com/nandhanotes
+      INSTANCE_ID: i-0e5ae2e038c3af67e
+      PUBLIC_URL: http://35.154.76.18
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node (for potential npm scripts)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install AWS CLI
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install awscli via pip
+        run: |
+          python -m pip install --upgrade pip
+          pip install awscli
+
+      - name: Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ env.REGION }}
+        run: |
+          echo "AWS credentials configured for region $AWS_DEFAULT_REGION"
+
+      - name: Log in to Amazon ECR
+        env:
+          REGION: ${{ env.REGION }}
+          ECR_REPO_URI: ${{ env.ECR_REPO_URI }}
+        run: |
+          aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_REPO_URI"
+
+      - name: Build Docker image
+        env:
+          ECR_REPO_URI: ${{ env.ECR_REPO_URI }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          IMAGE_URI="${ECR_REPO_URI}:${IMAGE_TAG}"
+          echo "Building image $IMAGE_URI"
+          docker build -t "$IMAGE_URI" .
+
+      - name: Push Docker image to ECR
+        env:
+          ECR_REPO_URI: ${{ env.ECR_REPO_URI }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          IMAGE_URI="${ECR_REPO_URI}:${IMAGE_TAG}"
+          echo "Pushing image $IMAGE_URI"
+          docker push "$IMAGE_URI"
+
+      - name: Deploy to EC2 via SSM
+        env:
+          REGION: ${{ env.REGION }}
+          INSTANCE_ID: ${{ env.INSTANCE_ID }}
+          ECR_REPO_URI: ${{ env.ECR_REPO_URI }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          IMAGE_URI="${ECR_REPO_URI}:${IMAGE_TAG}"
+          cat > /tmp/ssm-params.json << 'SSMPARAMS'
+          {
+            "commands": [
+              "aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REPO_URI",
+              "docker pull $IMAGE_URI",
+              "docker stop app || true",
+              "docker rm app || true",
+              "docker run -d --restart always -p 5000:5000 --name app $IMAGE_URI"
+            ]
+          }
+          SSMPARAMS
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --region "$REGION" \
+            --document-name "AWS-RunShellScript" \
+            --parameters file:///tmp/ssm-params.json \
+            --query "Command.CommandId" \
+            --output text)
+          echo "SSM command sent, ID: $COMMAND_ID"
+          # Wait for command to finish (simple poll)
+          for i in {1..30}; do
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region "$REGION" \
+              --query "CommandInvocations[0].Status" \
+              --output text)
+            echo "SSM command status: $STATUS"
+            if [[ "$STATUS" == "Success" ]]; then
+              break
+            elif [[ "$STATUS" == "Failed" || "$STATUS" == "Cancelled" || "$STATUS" == "TimedOut" ]]; then
+              echo "SSM command failed"
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Health check – ensure service returns HTTP 200
+        env:
+          PUBLIC_URL: ${{ env.PUBLIC_URL }}
+        run: |
+          echo "Waiting for the application to become healthy..."
+          for i in {1..30}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_URL")
+            echo "Attempt $i – HTTP status: $HTTP_CODE"
+            if [[ "$HTTP_CODE" -eq 200 ]]; then
+              echo "✅ Application is healthy."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "❌ Health check failed after multiple attempts."
+          exit 1
