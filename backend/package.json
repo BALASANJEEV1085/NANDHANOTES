@@ -1,15 +1,16 @@
 {
-  "name": "your-backend-name",
-  "version": "1.0.0",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
   "dependencies": {
-    "express": "^4.17.1"
+    "express": "^4.17.1",
+    "vite": "8.3.0"
   },
   "devDependencies": {},
   "engines": {
-    "node": ">=14"
-  }
+    "node": "\u003e=14"
+  },
+  "main": "server.js",
+  "name": "your-backend-name",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "version": "1.0.0"
 }
