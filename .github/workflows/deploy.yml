@@ -1,4 +1,4 @@
-name: Build & Deploy to EC2 Docker
+name: Production Build & Deploy to EC2 Docker
 
 on:
   push:
@@ -7,61 +7,56 @@ on:
 
 env:
   AWS_DEFAULT_REGION: ap-south-1
+  ECR_REGISTRY: 759204735992.dkr.ecr.ap-south-1.amazonaws.com
   ECR_REPOSITORY: nandhanotes
   INSTANCE_ID: i-0a271ad87f3d9cf63
   PUBLIC_URL: http://15.207.142.152
-  TARGET_PORT: 80
   DOCKERFILE_PATH: .
 
 jobs:
-  deploy:
-    name: Build, Push and Deploy
+  build-and-deploy:
+    name: Build, Push and Deploy to EC2
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ap-south-1
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        run: |
-          set -e
-          aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin 759204735992.dkr.ecr.ap-south-1.amazonaws.com
-          echo "registry=759204735992.dkr.ecr.ap-south-1.amazonaws.com" >> $GITHUB_OUTPUT
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build, tag, and push Docker image to ECR
-        id: build-image
+      - name: Login to Amazon ECR
         run: |
-          set -e
-          ECR_REGISTRY="759204735992.dkr.ecr.ap-south-1.amazonaws.com"
-          FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
-          echo "Building $FULL_IMAGE:latest"
-          docker build --tag "$FULL_IMAGE:$GITHUB_SHA" --tag "$FULL_IMAGE:latest" .
-          docker push "$FULL_IMAGE:$GITHUB_SHA"
+          aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | \
+          docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+
+      - name: Build, tag, and push Docker image to Amazon ECR
+        id: build-image
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          FULL_IMAGE="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
+          docker build \
+            --tag "$FULL_IMAGE:${{ github.sha }}" \
+            --tag "$FULL_IMAGE:latest" \
+            --file "${{ env.DOCKERFILE_PATH }}/Dockerfile" \
+            "${{ env.DOCKERFILE_PATH }}"
+          docker push "$FULL_IMAGE:${{ github.sha }}"
           docker push "$FULL_IMAGE:latest"
           echo "full_image=$FULL_IMAGE" >> "$GITHUB_OUTPUT"
           echo "image_uri=$FULL_IMAGE:latest" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy to EC2 via SSM
+      - name: Deploy to EC2 via AWS SSM
         env:
-          ECR_REGISTRY: 759204735992.dkr.ecr.ap-south-1.amazonaws.com
-          IMAGE_URI: ${{ steps.build-image.outputs.image_uri }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          set -e
-          export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-          export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
-          export AWS_DEFAULT_REGION="$AWS_DEFAULT_REGION"
-          REGION="ap-south-1"
-          INSTANCE_ID="i-0a271ad87f3d9cf63"
-          ECR_REGISTRY="759204735992.dkr.ecr.ap-south-1.amazonaws.com"
-          REPO="nandhanotes"
-          IMAGE_URI="$ECR_REGISTRY/$REPO:latest"
+          REGION="${{ env.AWS_DEFAULT_REGION }}"
+          INSTANCE_ID="${{ env.INSTANCE_ID }}"
+          ECR_REGISTRY="${{ env.ECR_REGISTRY }}"
+          IMAGE_URI="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest"
 
-          # Write SSM commands to a JSON file to avoid shell parsing issues
           cat > /tmp/ssm-params.json << 'SSMPARAMS'
           {
             "commands": [
@@ -83,14 +78,14 @@ jobs:
             --output text)
           echo "SSM Command ID: $COMMAND_ID"
 
-          # Wait for the command to complete
           for i in $(seq 1 30); do
             STATUS=$(aws ssm list-command-invocations \
               --command-id "$COMMAND_ID" \
               --instance-id "$INSTANCE_ID" \
               --region "$REGION" \
               --query "CommandInvocations[0].Status" \
-              --output text 2>/dev/null || echo "Pending")
+              --output text 2>/dev/null)
+            echo "Attempt $i: Status=$STATUS"
             if [ "$STATUS" = "Success" ]; then
               echo "SSM command completed successfully"
               break
@@ -105,25 +100,20 @@ jobs:
                 --output text
               exit 1
             fi
-            sleep 5
+            sleep 10
           done
 
       - name: Health Check
         run: |
-          echo "Waiting for container to be ready..."
-          sleep 15
-          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 30 --max-time 60 http://15.207.142.152 || echo "failed")
-          if [ "$STATUS_CODE" = "200" ]; then
-            echo "✓ Health check passed - HTTP 200 from http://15.207.142.152"
-          else
-            echo "✗ Health check failed - got HTTP $STATUS_CODE"
-            curl -v --connect-timeout 15 http://15.207.142.152 2>&1 || true
-            exit 1
-          fi
-
-      - name: Deployment Summary
-        run: |
-          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- **Application URL:** http://15.207.142.152" >> $GITHUB_STEP_SUMMARY
-          echo "- **ECR Repository:** 759204735992.dkr.ecr.ap-south-1.amazonaws.com/nandhanotes" >> $GITHUB_STEP_SUMMARY
-          echo "- **Instance ID:** i-0a271ad87f3d9cf63" >> $GITHUB_STEP_SUMMARY
+          echo "Performing health check against ${{ env.PUBLIC_URL }}"
+          for i in $(seq 1 12); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 10 "${{ env.PUBLIC_URL }}" 2>/dev/null || echo "000")
+            echo "Attempt $i: HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Health check passed - application is running"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Health check failed - application is not responding with HTTP 200"
+          exit 1
