@@ -1,7 +1,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install --include=dev --legacy-peer-deps
 COPY frontend/ ./
 RUN npm run build
 
@@ -15,7 +15,7 @@ FROM node:20-alpine
 RUN apk add --no-cache nginx
 RUN mkdir -p /run/nginx /etc/nginx/http.d /etc/nginx/conf.d
 
-COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
+COPY --from=frontend-builder /app/frontend/build /usr/share/nginx/html
 COPY --from=backend-builder /app/backend /usr/src/app
 
 RUN echo 'server { \

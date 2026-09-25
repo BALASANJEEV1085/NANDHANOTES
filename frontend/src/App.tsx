@@ -14,7 +14,7 @@ import { JoinChannelModal } from './components/join-channel-modal';
 import { SettingsModal } from './components/settings-modal';
 import { NoteViewer } from './components/note-viewer';
 import { Button } from './components/ui/button';
-import { Toaster } from './components/ui/sonner';
+import { Toaster, toast } from 'react-hot-toast';
 import { LandingPage } from './components/landing-page';
 
 export default function App() {
@@ -371,7 +371,8 @@ export default function App() {
 
   const handleDownloadNote = async (noteId: string) => {
     try {
-      const note = notes.find(n => n.id === noteId);
+      const note = notes.find(n => n.id === noteId)
+        ?? (selectedNote?.id === noteId ? selectedNote : null);
       if (!note || !note.fileUrl) {
         toast.error('File not available for download');
         return;
@@ -496,10 +497,17 @@ export default function App() {
   useEffect(() => {
     const storedUser = localStorage.getItem('currentUser');
     if (storedUser) {
-      const userData = JSON.parse(storedUser);
-      setUser(userData);
-      // If user is logged in, go directly to app, otherwise stay on landing
-      setCurrentScreen('app');
+      try {
+        const userData = JSON.parse(storedUser);
+        if (userData?.email) {
+          setUser(userData);
+          setCurrentScreen('app');
+        } else {
+          localStorage.removeItem('currentUser');
+        }
+      } catch {
+        localStorage.removeItem('currentUser');
+      }
     }
   }, []);
 
@@ -507,7 +515,7 @@ export default function App() {
 
   // Get channel data for selected channel
   const getSelectedChannelData = () => {
-    if (!selectedChannel) return null;
+    if (!selectedChannel || !user) return null;
     
     const channel = channels.find(ch => ch.id === selectedChannel);
     if (!channel) return null;
@@ -667,7 +675,6 @@ export default function App() {
 
         {currentPage === 'bookmarks' && (
           <BookmarksPage
-            bookmarkedNotes={bookmarkedNotes}
             onViewNote={(note) => setSelectedNote(note)}
             onToggleBookmark={handleToggleBookmark}
             onDownloadNote={handleDownloadNote}
@@ -731,17 +738,3 @@ export default function App() {
     </>
   );
 }
-
-// Add toast function if not already present
-const toast = {
-  success: (message: string) => {
-    // This would typically come from your toast library
-    console.log('Success:', message);
-  },
-  error: (message: string) => {
-    console.log('Error:', message);
-  },
-  info: (message: string) => {
-    console.log('Info:', message);
-  }
-};

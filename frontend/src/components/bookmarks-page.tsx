@@ -13,7 +13,7 @@ interface Note {
   regulation: string;
   year: string;
   description: string;
-  fileType: 'pdf' | 'image' | 'ppt';
+  fileType: 'pdf' | 'image' | 'ppt' | 'doc';
   uploadedBy: string;
   uploadDate: string;
   isBookmarked: boolean;
